@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     CORS_ORIGINS: str
+    GOOGLE_CLIENT_ID: str
 
     model_config = SettingsConfigDict(
         env_file = ".env",
