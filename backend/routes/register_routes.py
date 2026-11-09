@@ -4,7 +4,7 @@ from passlib.context import CryptContext
 
 from database import get_db
 from models import User
-from schemas import UserCreate, UserResponse
+from schemas.schemas import UserCreate, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Register"])
 

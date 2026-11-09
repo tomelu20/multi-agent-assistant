@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
     View,
     TextInput,
-    Image,
     TouchableOpacity,
     SafeAreaView,
     KeyboardAvoidingView,
@@ -12,19 +11,99 @@ import {
     ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+const GOOGLE_CLIENT_ID = '682446417323-24l2f06p3ojfq1uop8k63crnmb5503dv.apps.googleusercontent.com';
 
 export default function Login({ navigation }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
-    const handleLogin = () => {
-        console.log('Autentificare cu:', { email, password });
-        alert('Autentificare reușită!');
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const scriptId = 'google-gsi-script';
+            if (!document.getElementById(scriptId)) {
+                const script = document.createElement('script');
+                script.id = scriptId;
+                script.src = 'https://accounts.google.com/gsi/client';
+                script.async = true;
+                script.defer = true;
+                document.body.appendChild(script);
+            }
+        }
+    }, []);
+
+    const handleLogin = async () => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert('Autentificare reușită!');
+                console.log('JWT primit:', data.access_token);
+            } else {
+                alert(data.detail || 'Eroare la autentificare');
+            }
+        } catch (error) {
+            console.error('Eroare rețea:', error);
+            alert('Nu s-a putut stabili conexiunea cu serverul.');
+        }
     };
 
-    const handleGoogleLogin = () => {
-        alert('Redirecționare Google OAuth...');
+    const sendTokenToBackend = async (accessToken) => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/auth/google/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: accessToken }),
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert(`Bun venit, ${data.name}!`);
+                console.log('JWT Google primit:', data.access_token);
+            } else {
+                alert(data.detail || 'Eroare la server.');
+            }
+        } catch (error) {
+            console.error('Eroare trimitere token:', error);
+            alert('Eroare de comunicare cu serverul.');
+        }
+    };
+
+    const handleGoogleLoginWeb = () => {
+        if (window.google && window.google.accounts) {
+            const client = window.google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: 'email profile openid',
+                callback: async (response) => {
+                    if (response.access_token) {
+                        await sendTokenToBackend(response.access_token);
+                    }
+                },
+            });
+            client.requestAccessToken();
+        } else {
+            alert('SDK-ul Google se încarcă. Mai încearcă o dată.');
+        }
+    };
+
+    const handleGoogleLoginMobile = async () => {
+        try {
+            await GoogleSignin.hasPlayServices();
+            const userInfo = await GoogleSignin.signIn();
+            const idToken = userInfo.data?.idToken || userInfo.idToken;
+            if (idToken) {
+                await sendTokenToBackend(idToken);
+            }
+        } catch (error) {
+            console.error('EROARE GOOGLE SIGN-IN MOBIL:', error);
+            alert('Eroare Google Sign-In: ' + (error.message || error));
+        }
     };
 
     return (
@@ -35,7 +114,6 @@ export default function Login({ navigation }) {
             >
                 <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
                     <View style={styles.card}>
-                        {/* Header / Logo */}
                         <View style={styles.header}>
                             <View style={styles.logoContainer}>
                                 <Ionicons name="sparkles" size={28} color="#818cf8" />
@@ -43,7 +121,6 @@ export default function Login({ navigation }) {
                             <Text style={styles.title}>Productivity Assistant</Text>
                             <Text style={styles.subtitle}>Sistem inteligent multi-agent pentru fluxul tău de lucru</Text>
 
-                            {/* Tab-uri Autentificare / Înregistrare */}
                             <View style={styles.tabsContainer}>
                                 <TouchableOpacity style={styles.tabActive}>
                                     <Text style={styles.tabTextActive}>Autentificare</Text>
@@ -58,7 +135,6 @@ export default function Login({ navigation }) {
                             </View>
                         </View>
 
-                        {/* Formular Login */}
                         <View style={styles.form}>
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Email</Text>
@@ -116,11 +192,11 @@ export default function Login({ navigation }) {
                                 <View style={styles.line} />
                             </View>
 
-                            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-                                <Image
-                                    source={{ uri: 'https://www.vectorlogo.zone/logos/google/google-icon.svg' }}
-                                    style={{ width: 18, height: 18, resizeMode: 'contain' }}
-                                />
+                            <TouchableOpacity
+                                style={styles.googleButton}
+                                onPress={Platform.OS === 'web' ? handleGoogleLoginWeb : handleGoogleLoginMobile}
+                            >
+                                <Ionicons name="logo-google" size={18} color="#f8fafc" />
                                 <Text style={styles.googleButtonText}>Google</Text>
                             </TouchableOpacity>
                         </View>
@@ -170,35 +246,16 @@ const styles = StyleSheet.create({
         borderBottomColor: '#1e293b',
         marginTop: 24,
     },
-    tabActive: {
-        flex: 1,
-        paddingVertical: 12,
-        alignItems: 'center',
-        position: 'relative',
-    },
-    tabInactive: {
-        flex: 1,
-        paddingVertical: 12,
-        alignItems: 'center',
-    },
+    tabActive: { flex: 1, paddingVertical: 12, alignItems: 'center', position: 'relative' },
+    tabInactive: { flex: 1, paddingVertical: 12, alignItems: 'center' },
     tabTextActive: { fontSize: 14, fontWeight: '600', color: '#f8fafc' },
     tabTextInactive: { fontSize: 14, fontWeight: '500', color: '#64748b' },
-    activeIndicator: {
-        position: 'absolute',
-        bottom: -1,
-        left: 0,
-        right: 0,
-        height: 2,
-        backgroundColor: '#818cf8',
-    },
+    activeIndicator: { position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, backgroundColor: '#818cf8' },
     form: { gap: 16, marginTop: 4 },
     inputGroup: { gap: 6 },
     labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     label: { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
-    inputWrapper: {
-        position: 'relative',
-        justifyContent: 'center',
-    },
+    inputWrapper: { position: 'relative', justifyContent: 'center' },
     inputIcon: { position: 'absolute', left: 14, zIndex: 1 },
     eyeIcon: { position: 'absolute', right: 14, zIndex: 1 },
     input: {
@@ -219,11 +276,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#4f46e5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-        elevation: 6,
         marginTop: 6,
     },
     submitButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
@@ -240,7 +292,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         gap: 8,
+        width: '100%',
     },
-    googleG: { fontSize: 18, fontWeight: 'bold', color: '#ea4335' },
     googleButtonText: { color: '#f8fafc', fontSize: 14, fontWeight: '500' },
 });

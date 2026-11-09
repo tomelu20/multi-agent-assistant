@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
     View,
-    Image,
     TextInput,
     TouchableOpacity,
     SafeAreaView,
@@ -12,6 +11,9 @@ import {
     Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+const GOOGLE_CLIENT_ID = '682446417323-24l2f06p3ojfq1uop8k63crnmb5503dv.apps.googleusercontent.com';
 
 export default function Register({ navigation }) {
     const [name, setName] = useState('');
@@ -20,6 +22,20 @@ export default function Register({ navigation }) {
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const scriptId = 'google-gsi-script';
+            if (!document.getElementById(scriptId)) {
+                const script = document.createElement('script');
+                script.id = scriptId;
+                script.src = 'https://accounts.google.com/gsi/client';
+                script.async = true;
+                script.defer = true;
+                document.body.appendChild(script);
+            }
+        }
+    }, []);
 
     const handlePhoneChange = (text) => {
         const cleaned = text.replace(/\D/g, '');
@@ -34,16 +50,85 @@ export default function Register({ navigation }) {
     const hasNumber = /[0-9]/.test(password);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
 
-    const handleRegister = () => {
+    const handleRegister = async () => {
         if (phone.length > 10) {
             alert('Numărul de telefon poate avea maximum 10 cifre!');
             return;
         }
-        alert('Înregistrare reușită!');
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    surname,
+                    email,
+                    phone_number: phone,
+                    password,
+                }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert('Înregistrare reușită! Te poți autentifica.');
+                navigation.navigate('Login');
+            } else {
+                alert(data.detail || 'Eroare la înregistrare');
+            }
+        } catch (error) {
+            console.error('Eroare rețea:', error);
+        }
     };
 
-    const handleGoogleLogin = () => {
-        alert('Redirecționare Google OAuth...');
+    const sendTokenToBackend = async (accessToken) => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/auth/google/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: accessToken }),
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert(`Bun venit, ${data.name}!`);
+                console.log('JWT Google primit:', data.access_token);
+            } else {
+                alert(data.detail || 'Eroare la server.');
+            }
+        } catch (error) {
+            console.error('Eroare trimitere token:', error);
+        }
+    };
+
+    const handleGoogleLoginWeb = () => {
+        if (window.google && window.google.accounts) {
+            const client = window.google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: 'email profile openid',
+                callback: async (response) => {
+                    if (response.access_token) {
+                        await sendTokenToBackend(response.access_token);
+                    }
+                },
+            });
+            client.requestAccessToken();
+        } else {
+            alert('SDK-ul Google se încarcă. Mai încearcă o dată.');
+        }
+    };
+
+    const handleGoogleLoginMobile = async () => {
+        try {
+            await GoogleSignin.hasPlayServices();
+            const userInfo = await GoogleSignin.signIn();
+            const idToken = userInfo.data?.idToken || userInfo.idToken;
+            if (idToken) {
+                await sendTokenToBackend(idToken);
+            }
+        } catch (error) {
+            console.error('EROARE GOOGLE SIGN-IN MOBIL:', error);
+            alert('Eroare Google Sign-In: ' + (error.message || error));
+        }
     };
 
     return (
@@ -61,7 +146,6 @@ export default function Register({ navigation }) {
                             <Text style={styles.title}>Productivity Assistant</Text>
                             <Text style={styles.subtitle}>Sistem inteligent multi-agent pentru fluxul tău de lucru</Text>
 
-                            {/* Tab-uri Autentificare / Înregistrare */}
                             <View style={styles.tabsContainer}>
                                 <TouchableOpacity
                                     style={styles.tabInactive}
@@ -153,7 +237,7 @@ export default function Register({ navigation }) {
                                     <View style={styles.checkColumn}>
                                         <CheckItem text="Min. 8 caractere" isValid={hasMinLength} />
                                         <CheckItem text="O literă mică" isValid={hasLowerCase} />
-                                        <CheckItem text="Un caracter special (!@#$%^&*)" isValid={hasSpecialChar} />
+                                        <CheckItem text="Un caracter special" isValid={hasSpecialChar} />
                                     </View>
                                     <View style={styles.checkColumn}>
                                         <CheckItem text="O literă mare" isValid={hasUpperCase} />
@@ -172,11 +256,11 @@ export default function Register({ navigation }) {
                                 <View style={styles.line} />
                             </View>
 
-                            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-                                <Image
-                                    source={{ uri: 'https://www.vectorlogo.zone/logos/google/google-icon.svg' }}
-                                    style={{ width: 18, height: 18, resizeMode: 'contain' }}
-                                />
+                            <TouchableOpacity
+                                style={styles.googleButton}
+                                onPress={Platform.OS === 'web' ? handleGoogleLoginWeb : handleGoogleLoginMobile}
+                            >
+                                <Ionicons name="logo-google" size={18} color="#f8fafc" />
                                 <Text style={styles.googleButtonText}>Google</Text>
                             </TouchableOpacity>
                         </View>
@@ -234,35 +318,16 @@ const styles = StyleSheet.create({
         borderBottomColor: '#1e293b',
         marginTop: 20,
     },
-    tabActive: {
-        flex: 1,
-        paddingVertical: 12,
-        alignItems: 'center',
-        position: 'relative',
-    },
-    tabInactive: {
-        flex: 1,
-        paddingVertical: 12,
-        alignItems: 'center',
-    },
+    tabActive: { flex: 1, paddingVertical: 12, alignItems: 'center', position: 'relative' },
+    tabInactive: { flex: 1, paddingVertical: 12, alignItems: 'center' },
     tabTextActive: { fontSize: 14, fontWeight: '600', color: '#f8fafc' },
     tabTextInactive: { fontSize: 14, fontWeight: '500', color: '#64748b' },
-    activeIndicator: {
-        position: 'absolute',
-        bottom: -1,
-        left: 0,
-        right: 0,
-        height: 2,
-        backgroundColor: '#818cf8',
-    },
+    activeIndicator: { position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, backgroundColor: '#818cf8' },
     form: { gap: 14, marginTop: 4 },
     row: { flexDirection: 'row', gap: 12 },
     inputGroup: { gap: 6 },
     label: { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
-    inputWrapper: {
-        position: 'relative',
-        justifyContent: 'center',
-    },
+    inputWrapper: { position: 'relative', justifyContent: 'center' },
     eyeIcon: { position: 'absolute', right: 14, zIndex: 1 },
     input: {
         height: 44,
@@ -272,14 +337,8 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         paddingHorizontal: 14,
         color: '#f8fafc',
-        fontSize: 14,
     },
-    checklist: {
-        marginTop: 8,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 2
-    },
+    checklist: { marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
     checkColumn: { gap: 6, flex: 1 },
     checkItemRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#64748b' },
@@ -292,11 +351,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#4f46e5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-        elevation: 6,
         marginTop: 4,
     },
     submitButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
@@ -313,7 +367,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         gap: 8,
+        width: '100%',
     },
-    googleG: { fontSize: 18, fontWeight: 'bold', color: '#ea4335' },
     googleButtonText: { color: '#f8fafc', fontSize: 14, fontWeight: '500' },
 });

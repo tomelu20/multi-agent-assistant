@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 
 from database import get_db
 from models import User
-from auth_routes import create_access_token
+from routes.login_routes import create_access_token
 from config import settings
 
 router = APIRouter(prefix="/auth/google", tags=["Google Authentication"])
@@ -25,8 +25,8 @@ def google_auth(payload: dict, db: Session = Depends(get_db)):
             detail="Lipsește token-ul Google."
         )
 
-    # Validare ID Token direct la Google
-    google_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
+    # Validare prin UserInfo API folosind Access Token-ul primit de la Google client
+    google_url = f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={token}"
     response = requests.get(google_url)
 
     if response.status_code != 200:
@@ -36,14 +36,6 @@ def google_auth(payload: dict, db: Session = Depends(get_db)):
         )
 
     user_info = response.json()
-
-    # Verificare securizată a Client ID-ului (Audience)
-    token_audience = user_info.get("aud")
-    if token_audience != settings.GOOGLE_CLIENT_ID:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token-ul Google nu aparține acestei aplicații (Client ID invalid)."
-        )
 
     email = user_info.get("email")
     name = user_info.get("given_name", "Google")

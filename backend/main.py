@@ -11,7 +11,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from config import settings
-from routes.login_routes import router as auth_router
+from routes.login_routes import router as login_router
 from routes.register_routes import router as register_router
 from routes.google_auth_routes import router as google_auth_router
 
@@ -40,7 +40,7 @@ app.add_middleware(
     allow_headers = ["*"]
 )
 
-app.include_router(auth_router)
+app.include_router(login_router)
 app.include_router(register_router)
 app.include_router(google_auth_router)
 
