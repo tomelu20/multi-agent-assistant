@@ -20,6 +20,13 @@ export default function Login({ navigation }) {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
+    // Stări dedicate pentru fluxul de Forgot Password
+    const [isForgotPassword, setIsForgotPassword] = useState(false);
+    const [resetEmail, setResetEmail] = useState('');
+    const [resetToken, setResetToken] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [showNewPassword, setShowNewPassword] = useState(false);
+
     useEffect(() => {
         if (Platform.OS === 'web') {
             const scriptId = 'google-gsi-script';
@@ -47,6 +54,52 @@ export default function Login({ navigation }) {
                 console.log('JWT primit:', data.access_token);
             } else {
                 alert(data.detail || 'Eroare la autentificare');
+            }
+        } catch (error) {
+            console.error('Eroare rețea:', error);
+            alert('Nu s-a putut stabili conexiunea cu serverul.');
+        }
+    };
+
+    const handleForgotPasswordRequest = async () => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/auth/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: resetEmail }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert(data.message || 'Verifică emailul pentru instrucțiuni.');
+            } else {
+                alert(data.detail || 'A apărut o eroare.');
+            }
+        } catch (error) {
+            console.error('Eroare rețea:', error);
+            alert('Nu s-a putut stabili conexiunea cu serverul.');
+        }
+    };
+
+    const handleResetPassword = async () => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/auth/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: resetEmail,
+                    token: resetToken,
+                    new_password: newPassword
+                }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert('Parola a fost schimbată cu succes! Te poți autentifica.');
+                setIsForgotPassword(false);
+                setResetEmail('');
+                setResetToken('');
+                setNewPassword('');
+            } else {
+                alert(data.detail || 'Eroare la resetarea parolei.');
             }
         } catch (error) {
             console.error('Eroare rețea:', error);
@@ -123,83 +176,166 @@ export default function Login({ navigation }) {
 
                             <View style={styles.tabsContainer}>
                                 <TouchableOpacity style={styles.tabActive}>
-                                    <Text style={styles.tabTextActive}>Autentificare</Text>
+                                    <Text style={styles.tabTextActive}>
+                                        {isForgotPassword ? 'Resetare Parolă' : 'Autentificare'}
+                                    </Text>
                                     <View style={styles.activeIndicator} />
                                 </TouchableOpacity>
+                                {!isForgotPassword && (
+                                    <TouchableOpacity
+                                        style={styles.tabInactive}
+                                        onPress={() => navigation.navigate('Register')}
+                                    >
+                                        <Text style={styles.tabTextInactive}>Înregistrare</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+
+                        {isForgotPassword ? (
+                            <View style={styles.form}>
+                                <Text style={[styles.subtitle, { textAlign: 'left', marginBottom: 4 }]}>
+                                    Introdu adresa de email pentru a primi codul de resetare.
+                                </Text>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Email</Text>
+                                    <View style={styles.inputWrapper}>
+                                        <Ionicons name="mail-outline" size={18} color="#64748b" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="nume@exemplu.ro"
+                                            placeholderTextColor="#64748b"
+                                            value={resetEmail}
+                                            onChangeText={setResetEmail}
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
+                                        />
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity style={styles.submitButton} onPress={handleForgotPasswordRequest}>
+                                    <Text style={styles.submitButtonText}>Trimite Codul</Text>
+                                </TouchableOpacity>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Cod</Text>
+                                    <View style={styles.inputWrapper}>
+                                        <Ionicons name="key-outline" size={18} color="#64748b" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Introdu codul primit"
+                                            placeholderTextColor="#64748b"
+                                            value={resetToken}
+                                            onChangeText={setResetToken}
+                                            autoCapitalize="none"
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Parolă Nouă</Text>
+                                    <View style={styles.inputWrapper}>
+                                        <Ionicons name="lock-closed-outline" size={18} color="#64748b" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={[styles.input, { paddingRight: 40 }]}
+                                            placeholder="••••••••"
+                                            placeholderTextColor="#64748b"
+                                            value={newPassword}
+                                            onChangeText={setNewPassword}
+                                            secureTextEntry={!showNewPassword}
+                                        />
+                                        <TouchableOpacity
+                                            style={styles.eyeIcon}
+                                            onPress={() => setShowNewPassword(!showNewPassword)}
+                                        >
+                                            <Ionicons
+                                                name={showNewPassword ? "eye-off-outline" : "eye-outline"}
+                                                size={18}
+                                                color="#64748b"
+                                            />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity style={styles.submitButton} onPress={handleResetPassword}>
+                                    <Text style={styles.submitButtonText}>Resetează Parola</Text>
+                                </TouchableOpacity>
+
                                 <TouchableOpacity
-                                    style={styles.tabInactive}
-                                    onPress={() => navigation.navigate('Register')}
+                                    style={{ alignItems: 'center', marginTop: 12 }}
+                                    onPress={() => setIsForgotPassword(false)}
                                 >
-                                    <Text style={styles.tabTextInactive}>Înregistrare</Text>
+                                    <Text style={styles.linkText}>Înapoi la Autentificare</Text>
                                 </TouchableOpacity>
                             </View>
-                        </View>
-
-                        <View style={styles.form}>
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Email</Text>
-                                <View style={styles.inputWrapper}>
-                                    <Ionicons name="mail-outline" size={18} color="#64748b" style={styles.inputIcon} />
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder="nume@exemplu.ro"
-                                        placeholderTextColor="#64748b"
-                                        value={email}
-                                        onChangeText={setEmail}
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                    />
-                                </View>
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <View style={styles.labelRow}>
-                                    <Text style={styles.label}>Parolă</Text>
-                                    <TouchableOpacity onPress={() => alert('Recuperare parolă')}>
-                                        <Text style={styles.linkText}>Ai uitat parola?</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={styles.inputWrapper}>
-                                    <Ionicons name="lock-closed-outline" size={18} color="#64748b" style={styles.inputIcon} />
-                                    <TextInput
-                                        style={[styles.input, { paddingRight: 40 }]}
-                                        placeholder="••••••••"
-                                        placeholderTextColor="#64748b"
-                                        value={password}
-                                        onChangeText={setPassword}
-                                        secureTextEntry={!showPassword}
-                                    />
-                                    <TouchableOpacity
-                                        style={styles.eyeIcon}
-                                        onPress={() => setShowPassword(!showPassword)}
-                                    >
-                                        <Ionicons
-                                            name={showPassword ? "eye-off-outline" : "eye-outline"}
-                                            size={18}
-                                            color="#64748b"
+                        ) : (
+                            <View style={styles.form}>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Email</Text>
+                                    <View style={styles.inputWrapper}>
+                                        <Ionicons name="mail-outline" size={18} color="#64748b" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="nume@exemplu.ro"
+                                            placeholderTextColor="#64748b"
+                                            value={email}
+                                            onChangeText={setEmail}
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
                                         />
-                                    </TouchableOpacity>
+                                    </View>
                                 </View>
+
+                                <View style={styles.inputGroup}>
+                                    <View style={styles.labelRow}>
+                                        <Text style={styles.label}>Parolă</Text>
+                                        <TouchableOpacity onPress={() => setIsForgotPassword(true)}>
+                                            <Text style={styles.linkText}>Ai uitat parola?</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={styles.inputWrapper}>
+                                        <Ionicons name="lock-closed-outline" size={18} color="#64748b" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={[styles.input, { paddingRight: 40 }]}
+                                            placeholder="••••••••"
+                                            placeholderTextColor="#64748b"
+                                            value={password}
+                                            onChangeText={setPassword}
+                                            secureTextEntry={!showPassword}
+                                        />
+                                        <TouchableOpacity
+                                            style={styles.eyeIcon}
+                                            onPress={() => setShowPassword(!showPassword)}
+                                        >
+                                            <Ionicons
+                                                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                                                size={18}
+                                                color="#64748b"
+                                            />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity style={styles.submitButton} onPress={handleLogin}>
+                                    <Text style={styles.submitButtonText}>Autentificare</Text>
+                                </TouchableOpacity>
+
+                                <View style={styles.dividerContainer}>
+                                    <View style={styles.line} />
+                                    <Text style={styles.dividerText}>SAU CONTINUĂ CU</Text>
+                                    <View style={styles.line} />
+                                </View>
+
+                                <TouchableOpacity
+                                    style={styles.googleButton}
+                                    onPress={Platform.OS === 'web' ? handleGoogleLoginWeb : handleGoogleLoginMobile}
+                                >
+                                    <Ionicons name="logo-google" size={18} color="#f8fafc" />
+                                    <Text style={styles.googleButtonText}>Google</Text>
+                                </TouchableOpacity>
                             </View>
-
-                            <TouchableOpacity style={styles.submitButton} onPress={handleLogin}>
-                                <Text style={styles.submitButtonText}>Autentificare</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.dividerContainer}>
-                                <View style={styles.line} />
-                                <Text style={styles.dividerText}>SAU CONTINUĂ CU</Text>
-                                <View style={styles.line} />
-                            </View>
-
-                            <TouchableOpacity
-                                style={styles.googleButton}
-                                onPress={Platform.OS === 'web' ? handleGoogleLoginWeb : handleGoogleLoginMobile}
-                            >
-                                <Ionicons name="logo-google" size={18} color="#f8fafc" />
-                                <Text style={styles.googleButtonText}>Google</Text>
-                            </TouchableOpacity>
-                        </View>
+                        )}
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -269,7 +405,6 @@ const styles = StyleSheet.create({
         color: '#f8fafc',
         fontSize: 14,
     },
-    linkText: { fontSize: 12, color: '#818cf8', fontWeight: '500' },
     submitButton: {
         height: 48,
         backgroundColor: '#4f46e5',
@@ -282,6 +417,7 @@ const styles = StyleSheet.create({
     dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
     line: { flex: 1, height: 1, backgroundColor: '#1e293b' },
     dividerText: { marginHorizontal: 12, fontSize: 10, color: '#64748b', fontWeight: '600', letterSpacing: 0.8 },
+    linkText: { fontSize: 12, color: '#818cf8', fontWeight: '500' },
     googleButton: {
         flexDirection: 'row',
         height: 48,
