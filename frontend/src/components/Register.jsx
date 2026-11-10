@@ -23,6 +23,10 @@ export default function Register({ navigation }) {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
+    // Stări pentru erori
+    const [emailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+
     useEffect(() => {
         if (Platform.OS === 'web') {
             const scriptId = 'google-gsi-script';
@@ -44,15 +48,41 @@ export default function Register({ navigation }) {
         }
     };
 
+    const handleEmailChange = (text) => {
+        setEmail(text);
+        if (emailError) {
+            setEmailError('');
+        }
+    };
+
+    const handlePasswordChange = (text) => {
+        setPassword(text);
+        if (passwordError) {
+            setPasswordError('');
+        }
+    };
+
     const hasMinLength = password.length >= 8;
     const hasUpperCase = /[A-Z]/.test(password);
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumber = /[0-9]/.test(password);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
 
+    const isPasswordValid = hasMinLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar;
+
     const handleRegister = async () => {
+        // Resetează erorile la începutul încercării
+        setEmailError('');
+        setPasswordError('');
+
         if (phone.length > 10) {
             alert('Numărul de telefon poate avea maximum 10 cifre!');
+            return;
+        }
+
+        // Verificăm dacă parola respectă toate regulile înainte de trimite la server
+        if (!isPasswordValid) {
+            setPasswordError('Parola trebuie să conțină cel puțin 8 caractere, litere mari, mici, numere și caractere speciale.');
             return;
         }
 
@@ -73,7 +103,11 @@ export default function Register({ navigation }) {
                 alert('Înregistrare reușită! Te poți autentifica.');
                 navigation.navigate('Login');
             } else {
-                alert(data.detail || 'Eroare la înregistrare');
+                if (data.detail && data.detail.toLowerCase().includes('email')) {
+                    setEmailError(data.detail);
+                } else {
+                    alert(data.detail || 'Eroare la înregistrare');
+                }
             }
         } catch (error) {
             console.error('Eroare rețea:', error);
@@ -187,14 +221,15 @@ export default function Register({ navigation }) {
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Email</Text>
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, emailError ? styles.inputError : null]}
                                     placeholder="nume@exemplu.ro"
                                     placeholderTextColor="#64748b"
                                     value={email}
-                                    onChangeText={setEmail}
+                                    onChangeText={handleEmailChange}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                 />
+                                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
                             </View>
 
                             <View style={styles.inputGroup}>
@@ -214,11 +249,11 @@ export default function Register({ navigation }) {
                                 <Text style={styles.label}>Parolă</Text>
                                 <View style={styles.inputWrapper}>
                                     <TextInput
-                                        style={[styles.input, { paddingRight: 40 }]}
+                                        style={[styles.input, { paddingRight: 40 }, passwordError ? styles.inputError : null]}
                                         placeholder="••••••••"
                                         placeholderTextColor="#64748b"
                                         value={password}
-                                        onChangeText={setPassword}
+                                        onChangeText={handlePasswordChange}
                                         secureTextEntry={!showPassword}
                                     />
                                     <TouchableOpacity
@@ -232,6 +267,9 @@ export default function Register({ navigation }) {
                                         />
                                     </TouchableOpacity>
                                 </View>
+
+                                {/* Mesaj de eroare cu roșu sub parolă dacă cerințele nu sunt îndeplinite */}
+                                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
                                 <View style={styles.checklist}>
                                     <View style={styles.checkColumn}>
@@ -337,6 +375,15 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         paddingHorizontal: 14,
         color: '#f8fafc',
+    },
+    inputError: {
+        borderColor: '#ef4444',
+    },
+    errorText: {
+        fontSize: 11,
+        color: '#ef4444',
+        marginTop: 2,
+        marginLeft: 4,
     },
     checklist: { marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
     checkColumn: { gap: 6, flex: 1 },

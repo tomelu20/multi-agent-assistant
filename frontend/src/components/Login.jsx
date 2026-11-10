@@ -20,6 +20,9 @@ export default function Login({ navigation }) {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
+    // Stare dedicată pentru eroarea de la login
+    const [loginError, setLoginError] = useState('');
+
     // Stări dedicate pentru fluxul de Forgot Password
     const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [resetEmail, setResetEmail] = useState('');
@@ -41,7 +44,20 @@ export default function Login({ navigation }) {
         }
     }, []);
 
+    // Funcții de resetare a erorilor la tastare
+    const handleEmailChange = (text) => {
+        setEmail(text);
+        if (loginError) setLoginError('');
+    };
+
+    const handlePasswordChange = (text) => {
+        setPassword(text);
+        if (loginError) setLoginError('');
+    };
+
     const handleLogin = async () => {
+        setLoginError(''); // Resetăm eroarea la o nouă încercare
+
         try {
             const response = await fetch('http://127.0.0.1:8000/auth/login', {
                 method: 'POST',
@@ -53,11 +69,12 @@ export default function Login({ navigation }) {
                 alert('Autentificare reușită!');
                 console.log('JWT primit:', data.access_token);
             } else {
-                alert(data.detail || 'Eroare la autentificare');
+                // Dacă datele sunt incorecte, afișăm mesajul personalizat sub câmpuri
+                setLoginError(data.detail || 'Email sau parolă incorecte. Te rugăm să încerci din nou.');
             }
         } catch (error) {
             console.error('Eroare rețea:', error);
-            alert('Nu s-a putut stabili conexiunea cu serverul.');
+            setLoginError('Nu s-a putut stabili conexiunea cu serverul.');
         }
     };
 
@@ -276,11 +293,11 @@ export default function Login({ navigation }) {
                                     <View style={styles.inputWrapper}>
                                         <Ionicons name="mail-outline" size={18} color="#64748b" style={styles.inputIcon} />
                                         <TextInput
-                                            style={styles.input}
+                                            style={[styles.input, loginError ? styles.inputError : null]}
                                             placeholder="nume@exemplu.ro"
                                             placeholderTextColor="#64748b"
                                             value={email}
-                                            onChangeText={setEmail}
+                                            onChangeText={handleEmailChange}
                                             keyboardType="email-address"
                                             autoCapitalize="none"
                                         />
@@ -297,11 +314,11 @@ export default function Login({ navigation }) {
                                     <View style={styles.inputWrapper}>
                                         <Ionicons name="lock-closed-outline" size={18} color="#64748b" style={styles.inputIcon} />
                                         <TextInput
-                                            style={[styles.input, { paddingRight: 40 }]}
+                                            style={[styles.input, { paddingRight: 40 }, loginError ? styles.inputError : null]}
                                             placeholder="••••••••"
                                             placeholderTextColor="#64748b"
                                             value={password}
-                                            onChangeText={setPassword}
+                                            onChangeText={handlePasswordChange}
                                             secureTextEntry={!showPassword}
                                         />
                                         <TouchableOpacity
@@ -315,6 +332,9 @@ export default function Login({ navigation }) {
                                             />
                                         </TouchableOpacity>
                                     </View>
+
+                                    {/* Mesaj de eroare cu roșu sub câmpul de parolă */}
+                                    {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
                                 </View>
 
                                 <TouchableOpacity style={styles.submitButton} onPress={handleLogin}>
@@ -404,6 +424,15 @@ const styles = StyleSheet.create({
         paddingRight: 16,
         color: '#f8fafc',
         fontSize: 14,
+    },
+    inputError: {
+        borderColor: '#ef4444',
+    },
+    errorText: {
+        fontSize: 11,
+        color: '#ef4444',
+        marginTop: 2,
+        marginLeft: 4,
     },
     submitButton: {
         height: 48,
