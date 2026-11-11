@@ -15,15 +15,16 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 const GOOGLE_CLIENT_ID = '682446417323-24l2f06p3ojfq1uop8k63crnmb5503dv.apps.googleusercontent.com';
 
-export default function Login({ navigation }) {
+export default function Login({ route, navigation }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
-    // Stare dedicată pentru eroarea de la login
     const [loginError, setLoginError] = useState('');
 
-    // Stări dedicate pentru fluxul de Forgot Password
+    const successMessageFromRegister = route?.params?.successMessage || '';
+    const [successBanner, setSuccessBanner] = useState(successMessageFromRegister);
+
     const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [resetEmail, setResetEmail] = useState('');
     const [resetToken, setResetToken] = useState('');
@@ -44,19 +45,21 @@ export default function Login({ navigation }) {
         }
     }, []);
 
-    // Funcții de resetare a erorilor la tastare
     const handleEmailChange = (text) => {
         setEmail(text);
         if (loginError) setLoginError('');
+        if (successBanner) setSuccessBanner('');
     };
 
     const handlePasswordChange = (text) => {
         setPassword(text);
         if (loginError) setLoginError('');
+        if (successBanner) setSuccessBanner('');
     };
 
     const handleLogin = async () => {
-        setLoginError(''); // Resetăm eroarea la o nouă încercare
+        setLoginError('');
+        setSuccessBanner('');
 
         try {
             const response = await fetch('http://127.0.0.1:8000/auth/login', {
@@ -66,10 +69,9 @@ export default function Login({ navigation }) {
             });
             const data = await response.json();
             if (response.ok) {
-                alert('Autentificare reușită!');
-                console.log('JWT primit:', data.access_token);
+                console.log('Login reușit, redirecționare către Dashboard...');
+                navigation.replace('Dashboard', { userName: data.name || 'Utilizator' });
             } else {
-                // Dacă datele sunt incorecte, afișăm mesajul personalizat sub câmpuri
                 setLoginError(data.detail || 'Email sau parolă incorecte. Te rugăm să încerci din nou.');
             }
         } catch (error) {
@@ -126,6 +128,7 @@ export default function Login({ navigation }) {
 
     const sendTokenToBackend = async (accessToken) => {
         try {
+            console.log('Trimit token-ul Google către backend...');
             const response = await fetch('http://127.0.0.1:8000/auth/google/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -133,9 +136,11 @@ export default function Login({ navigation }) {
             });
 
             const data = await response.json();
+            console.log('Răspuns primit de la backend Google Auth:', data);
+
             if (response.ok) {
-                alert(`Bun venit, ${data.name}!`);
-                console.log('JWT Google primit:', data.access_token);
+                console.log('Redirecționare forțată către Dashboard...');
+                navigation.replace('Dashboard', { userName: data.name || 'Utilizator' });
             } else {
                 alert(data.detail || 'Eroare la server.');
             }
@@ -208,6 +213,13 @@ export default function Login({ navigation }) {
                                 )}
                             </View>
                         </View>
+
+                        {successBanner ? (
+                            <View style={styles.successBanner}>
+                                <Ionicons name="checkmark-circle" size={18} color="#34d399" />
+                                <Text style={styles.successBannerText}>{successBanner}</Text>
+                            </View>
+                        ) : null}
 
                         {isForgotPassword ? (
                             <View style={styles.form}>
@@ -333,7 +345,6 @@ export default function Login({ navigation }) {
                                         </TouchableOpacity>
                                     </View>
 
-                                    {/* Mesaj de eroare cu roșu sub câmpul de parolă */}
                                     {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
                                 </View>
 
@@ -395,6 +406,18 @@ const styles = StyleSheet.create({
     },
     title: { fontSize: 22, fontWeight: '700', color: '#f8fafc', letterSpacing: 0.3 },
     subtitle: { fontSize: 12, color: '#94a3b8', marginTop: 4, textAlign: 'center' },
+    successBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(52, 211, 153, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(52, 211, 153, 0.3)',
+        borderRadius: 12,
+        padding: 12,
+        gap: 8,
+        marginBottom: 16,
+    },
+    successBannerText: { fontSize: 12, color: '#34d399', fontWeight: '500', flex: 1 },
     tabsContainer: {
         flexDirection: 'row',
         width: '100%',

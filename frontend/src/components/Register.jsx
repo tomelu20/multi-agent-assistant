@@ -23,7 +23,6 @@ export default function Register({ navigation }) {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
-    // Stări pentru erori
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
 
@@ -71,7 +70,6 @@ export default function Register({ navigation }) {
     const isPasswordValid = hasMinLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar;
 
     const handleRegister = async () => {
-        // Resetează erorile la începutul încercării
         setEmailError('');
         setPasswordError('');
 
@@ -80,7 +78,6 @@ export default function Register({ navigation }) {
             return;
         }
 
-        // Verificăm dacă parola respectă toate regulile înainte de trimite la server
         if (!isPasswordValid) {
             setPasswordError('Parola trebuie să conțină cel puțin 8 caractere, litere mari, mici, numere și caractere speciale.');
             return;
@@ -100,8 +97,9 @@ export default function Register({ navigation }) {
             });
             const data = await response.json();
             if (response.ok) {
-                alert('Înregistrare reușită! Te poți autentifica.');
-                navigation.navigate('Login');
+                navigation.navigate('Login', {
+                    successMessage: 'Cont realizat cu succes! Autentifică-te pentru a avea acces la site.'
+                });
             } else {
                 if (data.detail && data.detail.toLowerCase().includes('email')) {
                     setEmailError(data.detail);
@@ -116,6 +114,7 @@ export default function Register({ navigation }) {
 
     const sendTokenToBackend = async (accessToken) => {
         try {
+            console.log('Trimite token Google spre backend din Register...');
             const response = await fetch('http://127.0.0.1:8000/auth/google/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -123,14 +122,18 @@ export default function Register({ navigation }) {
             });
 
             const data = await response.json();
+            console.log('Răspuns Google Token din Register:', data);
+
             if (response.ok) {
-                alert(`Bun venit, ${data.name}!`);
-                console.log('JWT Google primit:', data.access_token);
+                // Redirecționare directă în Dashboard din ecranul de înregistrare
+                console.log('Redirecționare directă către Dashboard din Register...');
+                navigation.replace('Dashboard', { userName: data.name || 'Utilizator' });
             } else {
                 alert(data.detail || 'Eroare la server.');
             }
         } catch (error) {
             console.error('Eroare trimitere token:', error);
+            alert('Eroare de comunicare cu serverul.');
         }
     };
 
@@ -268,7 +271,6 @@ export default function Register({ navigation }) {
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Mesaj de eroare cu roșu sub parolă dacă cerințele nu sunt îndeplinite */}
                                 {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
                                 <View style={styles.checklist}>
@@ -385,7 +387,7 @@ const styles = StyleSheet.create({
         marginTop: 2,
         marginLeft: 4,
     },
-    checklist: { marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
+    checklist: {marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
     checkColumn: { gap: 6, flex: 1 },
     checkItemRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#64748b' },
