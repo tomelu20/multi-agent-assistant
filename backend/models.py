@@ -80,6 +80,21 @@ class UserApproval(Base):
 
     workflow = relationship("Workflow", back_populates="user_approvals")
 
+class CalendarEvent(Base):
+    __tablename__ = 'calendar_events'
+
+    id = Column(UNIQUEIDENTIFIER, primary_key=True, default=uuid.uuid4)
+    user_id = Column(UNIQUEIDENTIFIER, ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
+    workflow_id = Column(UNIQUEIDENTIFIER, ForeignKey('workflows.id', ondelete="SET NULL"), nullable=True)
+    title = Column(String(200), nullable=False)
+    event_date = Column(String(10), nullable=False)  # Format DD-MM-YYYY
+    event_time = Column(String(20), nullable=False)  # Format HH:MM sau All Day
+    created_at = Column(DateTime, nullable=False, server_default=func.sysdatetime())
+    updated_at = Column(DateTime, nullable=False, server_default=func.sysdatetime(), onupdate=func.sysdatetime())
+
+    user = relationship("User", backref="calendar_events")
+    workflow = relationship("Workflow", backref="calendar_events")
+
 class UserMemory(Base):
     __tablename__ = 'user_memories'
 

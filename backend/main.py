@@ -14,6 +14,7 @@ from config import settings
 from routes.login_routes import router as login_router
 from routes.register_routes import router as register_router
 from routes.google_auth_routes import router as google_auth_router
+from routes.calendar_routes import router as calendar_router
 
 scheduler = BackgroundScheduler()
 
@@ -43,6 +44,7 @@ app.add_middleware(
 app.include_router(login_router)
 app.include_router(register_router)
 app.include_router(google_auth_router)
+app.include_router(calendar_router)
 
 @app.get("/")
 def root():

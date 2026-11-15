@@ -81,6 +81,24 @@ CREATE TABLE dbo.user_approvals (
 );
 GO
 
+-- Adăugare tabelă pentru evenimente de calendar
+IF OBJECT_ID('dbo.calendar_events', 'U') IS NOT NULL DROP TABLE dbo.calendar_events;
+GO
+
+CREATE TABLE dbo.calendar_events (
+    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    user_id UNIQUEIDENTIFIER NOT NULL,
+    workflow_id UNIQUEIDENTIFIER NULL,
+    title NVARCHAR(200) NOT NULL,
+    event_date NVARCHAR(10) NOT NULL,
+    event_time NVARCHAR(20) NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_CalendarEvents_Users FOREIGN KEY (user_id) REFERENCES dbo.users(id) ON DELETE CASCADE,
+    CONSTRAINT FK_CalendarEvents_Workflows FOREIGN KEY (workflow_id) REFERENCES dbo.workflows(id) ON DELETE NO ACTION
+);
+GO
+
 CREATE TABLE dbo.user_memories (
     id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id UNIQUEIDENTIFIER NOT NULL,

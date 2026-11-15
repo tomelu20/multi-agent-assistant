@@ -3,9 +3,12 @@ import { StyleSheet, View, SafeAreaView, Text, TouchableOpacity } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import Sidebar from './Sidebar';
 import ChatArea from './ChatArea';
+import Calendar from './Calendar'; // Importăm noul ecran de calendar
 
 export default function Dashboard({ route, navigation }) {
     const userName = route?.params?.userName || 'Utilizator';
+    const userId = route?.params?.userId;
+    const accessToken = route?.params?.accessToken;
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [activeSection, setActiveSection] = useState('chat');
 
@@ -90,11 +93,9 @@ export default function Dashboard({ route, navigation }) {
                     />
                 )}
 
+                {/* Aici randăm componenta Calendar pe care am creat-o */}
                 {activeSection === 'calendar' && (
-                    <View style={styles.contentSection}>
-                        <Text style={styles.sectionTitle}>Sincronizare Calendar</Text>
-                        <Text style={styles.sectionSub}>Gestionarea programului și detectarea conflictelor de timp.</Text>
-                    </View>
+                    <Calendar userId={userId} accessToken={accessToken} />
                 )}
 
                 {activeSection === 'logs' && (

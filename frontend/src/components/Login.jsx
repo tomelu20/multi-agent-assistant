@@ -70,7 +70,11 @@ export default function Login({ route, navigation }) {
             const data = await response.json();
             if (response.ok) {
                 console.log('Login reușit, redirecționare către Dashboard...');
-                navigation.replace('Dashboard', { userName: data.name || 'Utilizator' });
+                navigation.replace('Dashboard', {
+                    userName: data.name || 'Utilizator',
+                    userId: data.user_id,
+                    accessToken: data.access_token,
+                });
             } else {
                 setLoginError(data.detail || 'Email sau parolă incorecte. Te rugăm să încerci din nou.');
             }
@@ -140,7 +144,11 @@ export default function Login({ route, navigation }) {
 
             if (response.ok) {
                 console.log('Redirecționare forțată către Dashboard...');
-                navigation.replace('Dashboard', { userName: data.name || 'Utilizator' });
+                navigation.replace('Dashboard', {
+                    userName: data.name || 'Utilizator',
+                    userId: data.user_id,
+                    accessToken: data.access_token,
+                });
             } else {
                 alert(data.detail || 'Eroare la server.');
             }
