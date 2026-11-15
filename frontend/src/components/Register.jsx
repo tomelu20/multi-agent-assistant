@@ -23,8 +23,16 @@ export default function Register({ navigation }) {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
+    // Stări pentru fluxul de verificare email
+    const [verificationCode, setVerificationCode] = useState('');
+    const [isCodeSent, setIsCodeSent] = useState(false);
+    const [isEmailVerified, setIsEmailVerified] = useState(false);
+    const [isSendingCode, setIsSendingCode] = useState(false);
+    const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
+    const [codeError, setCodeError] = useState('');
 
     useEffect(() => {
         if (Platform.OS === 'web') {
@@ -52,6 +60,11 @@ export default function Register({ navigation }) {
         if (emailError) {
             setEmailError('');
         }
+        if (isEmailVerified || isCodeSent) {
+            setIsCodeSent(false);
+            setIsEmailVerified(false);
+            setVerificationCode('');
+        }
     };
 
     const handlePasswordChange = (text) => {
@@ -69,9 +82,74 @@ export default function Register({ navigation }) {
 
     const isPasswordValid = hasMinLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar;
 
+    const handleSendCode = async () => {
+        setEmailError('');
+        if (!email) {
+            setEmailError('Introdu o adresă de email validă.');
+            return;
+        }
+
+        setIsSendingCode(true);
+        try {
+            const response = await fetch('http://127.0.0.1:8000/auth/send-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setIsCodeSent(true);
+            } else {
+                if (data.detail && data.detail.toLowerCase().includes('email')) {
+                    setEmailError(data.detail);
+                } else {
+                    alert(data.detail || 'Eroare la trimiterea codului.');
+                }
+            }
+        } catch (error) {
+            console.error('Eroare rețea:', error);
+            alert('Eroare de comunicare cu serverul.');
+        } finally {
+            setIsSendingCode(false);
+        }
+    };
+
+    const handleVerifyCode = async () => {
+        setCodeError('');
+        if (!verificationCode) {
+            setCodeError('Introdu codul primit pe email.');
+            return;
+        }
+
+        setIsVerifyingCode(true);
+        try {
+            const response = await fetch('http://127.0.0.1:8000/auth/verify-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, code: verificationCode }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setIsEmailVerified(true);
+            } else {
+                setCodeError(data.detail || 'Cod incorect sau expirat.');
+            }
+        } catch (error) {
+            console.error('Eroare rețea:', error);
+            alert('Eroare de comunicare cu serverul.');
+        } finally {
+            setIsVerifyingCode(false);
+        }
+    };
+
     const handleRegister = async () => {
         setEmailError('');
         setPasswordError('');
+
+        if (!isEmailVerified) {
+            alert('Te rog să verifici adresa de email înainte de a crea contul.');
+            return;
+        }
 
         if (phone.length > 10) {
             alert('Numărul de telefon poate avea maximum 10 cifre!');
@@ -114,7 +192,6 @@ export default function Register({ navigation }) {
 
     const sendTokenToBackend = async (accessToken) => {
         try {
-            console.log('Trimite token Google spre backend din Register...');
             const response = await fetch('http://127.0.0.1:8000/auth/google/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -122,11 +199,7 @@ export default function Register({ navigation }) {
             });
 
             const data = await response.json();
-            console.log('Răspuns Google Token din Register:', data);
-
             if (response.ok) {
-                // Redirecționare directă în Dashboard din ecranul de înregistrare
-                console.log('Redirecționare directă către Dashboard din Register...');
                 navigation.replace('Dashboard', { userName: data.name || 'Utilizator' });
             } else {
                 alert(data.detail || 'Eroare la server.');
@@ -221,19 +294,79 @@ export default function Register({ navigation }) {
                                 </View>
                             </View>
 
+                            {/* Secțiunea Email cu text explicativ */}
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Email</Text>
-                                <TextInput
-                                    style={[styles.input, emailError ? styles.inputError : null]}
-                                    placeholder="nume@exemplu.ro"
-                                    placeholderTextColor="#64748b"
-                                    value={email}
-                                    onChangeText={handleEmailChange}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
+                                <View style={styles.rowEmail}>
+                                    <TextInput
+                                        style={[styles.input, { flex: 1 }, emailError ? styles.inputError : null, isEmailVerified && styles.inputSuccess]}
+                                        placeholder="nume@exemplu.ro"
+                                        placeholderTextColor="#64748b"
+                                        value={email}
+                                        onChangeText={handleEmailChange}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        editable={!isEmailVerified}
+                                    />
+                                    {!isEmailVerified && (
+                                        <TouchableOpacity
+                                            style={styles.smallButton}
+                                            onPress={handleSendCode}
+                                            disabled={isSendingCode}
+                                        >
+                                            <Text style={styles.smallButtonText}>
+                                                {isSendingCode ? 'Se trimite...' : (isCodeSent ? 'Retrimite' : 'Trimite cod')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {isEmailVerified && (
+                                        <View style={styles.verifiedBadge}>
+                                            <Ionicons name="checkmark-circle" size={22} color="#34d399" />
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Text informativ / ghidaj pentru utilizator */}
+                                {!isCodeSent && !isEmailVerified && (
+                                    <Text style={styles.helperText}>Introdu adresa de email și apasă „Trimite cod” pentru verificare.</Text>
+                                )}
+                                {isCodeSent && !isEmailVerified && (
+                                    <Text style={styles.helperTextActive}>Codul a fost trimis! Verifică-ți căsuța poștală.</Text>
+                                )}
+                                {isEmailVerified && (
+                                    <Text style={styles.successTextHelper}>Adresă de email verificată cu succes!</Text>
+                                )}
+
                                 {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
                             </View>
+
+                            {/* Câmpul pentru codul de verificare */}
+                            {isCodeSent && !isEmailVerified && (
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Introdu codul de 6 cifre</Text>
+                                    <View style={styles.rowEmail}>
+                                        <TextInput
+                                            style={[styles.input, { flex: 1 }, codeError ? styles.inputError : null]}
+                                            placeholder="123456"
+                                            placeholderTextColor="#64748b"
+                                            value={verificationCode}
+                                            onChangeText={setVerificationCode}
+                                            keyboardType="number-pad"
+                                            maxLength={6}
+                                        />
+                                        <TouchableOpacity
+                                            style={[styles.smallButton, { backgroundColor: '#10b981' }]}
+                                            onPress={handleVerifyCode}
+                                            disabled={isVerifyingCode}
+                                        >
+                                            <Text style={styles.smallButtonText}>
+                                                {isVerifyingCode ? 'Se verifică...' : 'Verifică'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    {codeError ? <Text style={styles.errorText}>{codeError}</Text> : null}
+                                </View>
+                            )}
 
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Număr de telefon (max. 10 cifre)</Text>
@@ -286,7 +419,10 @@ export default function Register({ navigation }) {
                                 </View>
                             </View>
 
-                            <TouchableOpacity style={styles.submitButton} onPress={handleRegister}>
+                            <TouchableOpacity
+                                style={[styles.submitButton, !isEmailVerified && { backgroundColor: '#374151' }]}
+                                onPress={handleRegister}
+                            >
                                 <Text style={styles.submitButtonText}>Creează cont</Text>
                             </TouchableOpacity>
 
@@ -365,6 +501,7 @@ const styles = StyleSheet.create({
     activeIndicator: { position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, backgroundColor: '#818cf8' },
     form: { gap: 14, marginTop: 4 },
     row: { flexDirection: 'row', gap: 12 },
+    rowEmail: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     inputGroup: { gap: 6 },
     label: { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
     inputWrapper: { position: 'relative', justifyContent: 'center' },
@@ -381,13 +518,34 @@ const styles = StyleSheet.create({
     inputError: {
         borderColor: '#ef4444',
     },
+    inputSuccess: {
+        borderColor: '#34d399',
+    },
+    verifiedBadge: {
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+    },
+    smallButton: {
+        height: 44,
+        backgroundColor: '#4f46e5',
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+    },
+    smallButtonText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+    helperText: { fontSize: 11, color: '#94a3b8', marginLeft: 4, marginTop: 2 },
+    helperTextActive: { fontSize: 11, color: '#818cf8', marginLeft: 4, marginTop: 2, fontWeight: '500' },
+    successTextHelper: { fontSize: 11, color: '#34d399', marginLeft: 4, marginTop: 2, fontWeight: '500' },
     errorText: {
         fontSize: 11,
         color: '#ef4444',
         marginTop: 2,
         marginLeft: 4,
     },
-    checklist: {marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
+    checklist: { marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
     checkColumn: { gap: 6, flex: 1 },
     checkItemRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#64748b' },
