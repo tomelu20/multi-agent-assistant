@@ -89,6 +89,7 @@ class CalendarEvent(Base):
     title = Column(String(200), nullable=False)
     event_date = Column(String(10), nullable=False)  # Format DD-MM-YYYY
     event_time = Column(String(20), nullable=False)  # Format HH:MM sau All Day
+    event_end_time = Column(String(5), nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.sysdatetime())
     updated_at = Column(DateTime, nullable=False, server_default=func.sysdatetime(), onupdate=func.sysdatetime())
 

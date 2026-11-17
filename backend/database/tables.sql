@@ -92,6 +92,7 @@ CREATE TABLE dbo.calendar_events (
     title NVARCHAR(200) NOT NULL,
     event_date NVARCHAR(10) NOT NULL,
     event_time NVARCHAR(20) NOT NULL,
+    event_end_time NVARCHAR(5) NULL,
     created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     CONSTRAINT FK_CalendarEvents_Users FOREIGN KEY (user_id) REFERENCES dbo.users(id) ON DELETE CASCADE,
@@ -111,7 +112,6 @@ CREATE TABLE dbo.user_memories (
     CONSTRAINT FK_UserMemories_Users  FOREIGN KEY (user_id) REFERENCES dbo.users(id) ON DELETE CASCADE
 );
 GO
-
 
 
 

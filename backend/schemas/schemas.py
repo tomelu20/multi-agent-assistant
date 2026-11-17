@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 class UserBase(BaseModel):
@@ -160,7 +160,34 @@ class CalendarEventBase(BaseModel):
 
 
 class CalendarEventCreate(CalendarEventBase):
+    end_time: str = Field(..., max_length=5)
     workflow_id: Optional[UUID] = None
+
+    @field_validator("time")
+    @classmethod
+    def validate_start_time(cls, value: str) -> str:
+        if value == "All Day":
+            raise ValueError("Ora de început este obligatorie pentru evenimentele noi.")
+        if datetime.strptime(value, "%H:%M").strftime("%H:%M") != value:
+            raise ValueError("Ora de început trebuie să fie în formatul HH:MM.")
+        return value
+
+    @field_validator("end_time")
+    @classmethod
+    def validate_end_time(cls, value: str) -> str:
+        try:
+            parsed_time = datetime.strptime(value, "%H:%M")
+        except ValueError as error:
+            raise ValueError("Ora de terminare trebuie să fie în formatul HH:MM.") from error
+        if parsed_time.strftime("%H:%M") != value:
+            raise ValueError("Ora de terminare trebuie să fie în formatul HH:MM.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "CalendarEventCreate":
+        if datetime.strptime(self.end_time, "%H:%M") <= datetime.strptime(self.time, "%H:%M"):
+            raise ValueError("Ora de terminare trebuie să fie după ora de început.")
+        return self
 
 
 class CalendarEventResponse(CalendarEventBase):
@@ -170,6 +197,7 @@ class CalendarEventResponse(CalendarEventBase):
 
     date: str = Field(validation_alias="event_date")
     time: str = Field(validation_alias="event_time")
+    end_time: Optional[str] = Field(default=None, validation_alias="event_end_time")
 
     class Config:
         from_attributes = True

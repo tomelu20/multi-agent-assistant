@@ -18,6 +18,8 @@ Fluxul arhitectural urmează un model ierarhic în care clientul trimite cererea
 ## 4. Implementare Proiect
 Implementarea este împărțită structural între directorul `/backend` (serviciul FastAPI care găzduiește logica agenților, rutele API și adaptoarele de unelte pentru calendar și task-uri) și directorul `/frontend` (aplicația React Native & Expo care oferă un panou de control unificat pentru utilizator). Comunicarea se realizează prin protocoale HTTP/REST asincrone, iar validarea payload-urilor se face riguros pe ambele capete folosind scheme Pydantic pe server și tipuri TypeScript pe client.
 
+Evenimentele noi din calendar necesită ora de început și ora de terminare. Pentru bazele de date existente, executați o singură dată scriptul `backend/database/migrate_calendar_event_end_time.sql` înainte de a porni versiunea nouă; evenimentele vechi rămân valide și fără ora de terminare.
+
 Pe parcursul implementării, s-a pus un accent deosebit pe siguranța datelor și pattern-ul *Human-in-the-Loop*: nicio acțiune de scriere (cum ar fi crearea automată a unui eveniment în calendar sau salvarea unui task) nu este executată direct de către agenți fără acordul explicit și confirmarea vizuală din interfața utilizatorului. Această abordare elimină riscul modificărilor accidentale și garantează controlul complet al utilizatorului asupra fluxului de productivitate.
 
 ## 5. Testare și Evaluare (Unit Tests, Research AI & Metrici)

@@ -88,6 +88,7 @@ def create_calendar_event(
         title=event_data.title,
         event_date=event_data.date,
         event_time=event_data.time,
+        event_end_time=event_data.end_time,
         user_id=current_user.id,
         workflow_id=event_data.workflow_id,
     )

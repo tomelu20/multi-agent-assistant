@@ -11,6 +11,16 @@ const formatDateToRO = (date) => {
     return `${day}-${month}-${year}`;
 };
 
+const isValidTime = (value) => {
+    const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+    return match !== null;
+};
+
+const getTimeInMinutes = (value) => {
+    const [hours, minutes] = value.split(':').map(Number);
+    return hours * 60 + minutes;
+};
+
 export default function Calendar({ accessToken }) {
     const [currentDate, setCurrentDate] = useState(() => new Date());
     const [selectedDate, setSelectedDate] = useState(() => formatDateToRO(new Date()));
@@ -25,6 +35,7 @@ export default function Calendar({ accessToken }) {
     const [showAddModal, setShowAddModal] = useState(false);
     const [newTitle, setNewTitle] = useState('');
     const [newTime, setNewTime] = useState('10:00');
+    const [newEndTime, setNewEndTime] = useState('11:00');
 
     useEffect(() => {
         let isCurrent = true;
@@ -152,6 +163,17 @@ export default function Calendar({ accessToken }) {
             return;
         }
 
+        const startTime = newTime.trim();
+        const endTime = newEndTime.trim();
+        if (!isValidTime(startTime) || !isValidTime(endTime)) {
+            setRequestError('Introdu ore valide în formatul HH:MM.');
+            return;
+        }
+        if (endTime <= startTime) {
+            setRequestError('Ora de terminare trebuie să fie după ora de început.');
+            return;
+        }
+
         setRequestError('');
 
         try {
@@ -164,7 +186,8 @@ export default function Calendar({ accessToken }) {
                 body: JSON.stringify({
                     title: newTitle.trim(),
                     date: selectedDate,
-                    time: newTime.trim(),
+                    time: startTime,
+                    end_time: endTime,
                 }),
             });
 
@@ -176,6 +199,7 @@ export default function Calendar({ accessToken }) {
             setEvents(previousEvents => [...previousEvents, savedEvent]);
             setNewTitle('');
             setNewTime('10:00');
+            setNewEndTime('11:00');
             setShowAddModal(false);
         } catch (error) {
             console.error('Eroare la salvarea evenimentului:', error);
@@ -234,6 +258,7 @@ export default function Calendar({ accessToken }) {
         const displayLabel = hourNum === 0 ? '12 AM' : hourNum < 12 ? `${hourNum} AM` : hourNum === 12 ? '12 PM' : `${hourNum - 12} PM`;
         return { hourNum, label: displayLabel };
     });
+    const activeTimeGridColumns = viewMode === 'day' ? [selectedDate] : getWeekDays().map(day => day.dateString);
 
     return (
         <View style={styles.container}>
@@ -388,7 +413,7 @@ export default function Calendar({ accessToken }) {
                                                     <View key={ev.id} style={styles.miniEventBadge}>
                                                         <View style={styles.dotIndicator} />
                                                         <Text numberOfLines={1} style={styles.miniEventText}>
-                                                            {ev.time !== 'All Day' ? `${ev.time} ` : ''}{ev.title}
+                                                            {ev.time !== 'All Day' ? `${ev.time}${ev.end_time ? ` - ${ev.end_time}` : ''} ` : ''}{ev.title}
                                                         </Text>
                                                     </View>
                                                 ))}
@@ -431,17 +456,21 @@ export default function Calendar({ accessToken }) {
                             {/* Corp cu Scroll de la 00:00 la 23:59 */}
                             <ScrollView style={styles.timeGridScroll} showsVerticalScrollIndicator={true}>
                                 {hours24.map((hObj) => {
-                                    const activeCols = viewMode === 'day' ? [selectedDate] : getWeekDays().map(w => w.dateString);
+                                    const hourEvents = events.filter(event =>
+                                        activeTimeGridColumns.includes(event.date) &&
+                                        getTimeInMinutes(event.time) >= hObj.hourNum * 60 &&
+                                        getTimeInMinutes(event.time) < (hObj.hourNum + 1) * 60
+                                    );
                                     return (
-                                        <View key={hObj.hourNum} style={styles.hourRow}>
+                                        <View key={hObj.hourNum} style={[styles.hourRow, hourEvents.length > 0 && styles.hourRowWithEvent]}>
                                             <View style={styles.hourLabelContainer}>
                                                 <Text style={styles.hourLabelText}>{hObj.hourNum === 0 ? '' : hObj.label}</Text>
                                             </View>
-                                            {activeCols.map((colDate, cIdx) => {
+                                            {activeTimeGridColumns.map((colDate, cIdx) => {
                                                 const slotEvents = events.filter(e => {
                                                     if (e.date !== colDate) return false;
-                                                    const evHour = parseInt(e.time.split(':')[0], 10);
-                                                    return evHour === hObj.hourNum;
+                                                    const eventMinutes = getTimeInMinutes(e.time);
+                                                    return eventMinutes >= hObj.hourNum * 60 && eventMinutes < (hObj.hourNum + 1) * 60;
                                                 });
 
                                                 return (
@@ -451,13 +480,30 @@ export default function Calendar({ accessToken }) {
                                                         onPress={() => {
                                                             setSelectedDate(colDate);
                                                             setNewTime(`${String(hObj.hourNum).padStart(2, '0')}:00`);
+                                                            setNewEndTime(hObj.hourNum === 23
+                                                                ? '23:59'
+                                                                : `${String(hObj.hourNum + 1).padStart(2, '0')}:00`);
                                                             setShowAddModal(true);
                                                         }}
                                                     >
                                                         {slotEvents.map(ev => (
-                                                            <View key={ev.id} style={styles.gridEventBadge}>
-                                                                <View style={styles.dotIndicator} />
-                                                                <Text numberOfLines={1} style={styles.gridEventText}>{ev.time} {ev.title}</Text>
+                                                            <View
+                                                                key={ev.id}
+                                                                style={[
+                                                                    styles.gridEventBlock,
+                                                                    {
+                                                                        top: (getTimeInMinutes(ev.time) % 60) * (50 / 60),
+                                                                        height: Math.max(
+                                                                            20,
+                                                                            ((getTimeInMinutes(ev.end_time || ev.time) -
+                                                                                getTimeInMinutes(ev.time)) || 30) * (50 / 60)
+                                                                        ),
+                                                                    },
+                                                                ]}
+                                                            >
+                                                                <Text numberOfLines={1} style={styles.gridEventText}>
+                                                                    {ev.time}{ev.end_time ? ` - ${ev.end_time}` : ''} {ev.title}
+                                                                </Text>
                                                             </View>
                                                         ))}
                                                     </TouchableOpacity>
@@ -513,7 +559,9 @@ export default function Calendar({ accessToken }) {
                                     <Ionicons name="time-outline" size={14} color="#818cf8" />
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.sideEventTitle}>{ev.title}</Text>
-                                        <Text style={styles.sideEventTime}>{ev.time}</Text>
+                                        <Text style={styles.sideEventTime}>
+                                            {ev.time}{ev.end_time ? ` - ${ev.end_time}` : ''}
+                                        </Text>
                                     </View>
                                     <TouchableOpacity
                                         onPress={() => handleDeleteEvent(ev.id)}
@@ -538,10 +586,19 @@ export default function Calendar({ accessToken }) {
                             />
                             <TextInput
                                 style={styles.input}
-                                placeholder="Ora (ex: 14:00)"
+                                placeholder="Ora de început (ex: 14:00)"
                                 placeholderTextColor="#64748b"
                                 value={newTime}
                                 onChangeText={setNewTime}
+                                maxLength={5}
+                            />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Ora de terminare (ex: 15:00)"
+                                placeholderTextColor="#64748b"
+                                value={newEndTime}
+                                onChangeText={setNewEndTime}
+                                maxLength={5}
                             />
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddModal(false)}>
@@ -653,11 +710,12 @@ const styles = StyleSheet.create({
     timeDayHeaderNum: { fontSize: 13, color: '#f8fafc', fontWeight: '700', marginTop: 2 },
     timeDayHeaderCircle: { fontSize: 13, color: '#fff', backgroundColor: '#4f46e5', width: 24, height: 24, borderRadius: 12, textAlign: 'center', lineHeight: 24, fontWeight: '700', marginTop: 2 },
     timeGridScroll: { flex: 1 },
-    hourRow: { flexDirection: 'row', height: 50, borderBottomWidth: 0.5, borderBottomColor: '#1e293b' },
+    hourRow: { flexDirection: 'row', height: 50, borderBottomWidth: 0.5, borderBottomColor: '#1e293b', overflow: 'visible' },
+    hourRowWithEvent: { zIndex: 1, elevation: 1 },
     hourLabelContainer: { width: 60, alignItems: 'flex-end', paddingRight: 8, paddingTop: 4 },
     hourLabelText: { fontSize: 10, color: '#64748b', fontWeight: '500' },
-    hourCell: { flex: 1, borderLeftWidth: 0.5, borderLeftColor: '#1e293b', padding: 2 },
-    gridEventBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(99, 102, 241, 0.3)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, marginBottom: 2 },
+    hourCell: { flex: 1, borderLeftWidth: 0.5, borderLeftColor: '#1e293b', padding: 2, position: 'relative', overflow: 'visible' },
+    gridEventBlock: { position: 'absolute', left: 2, right: 2, zIndex: 2, backgroundColor: 'rgba(99, 102, 241, 0.7)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
     gridEventText: { fontSize: 11, color: '#f8fafc', fontWeight: '600' },
 
     yearViewContainer: { flex: 1, padding: 8 },
