@@ -229,7 +229,10 @@ export default function Calendar({ accessToken }) {
         }
     };
 
-    const selectedDayEvents = events.filter(e => e.date === selectedDate);
+    // Sortează evenimentele pentru ziua selectată în ordine cronologică
+    const selectedDayEvents = events
+        .filter(e => e.date === selectedDate)
+        .sort((a, b) => getTimeInMinutes(a.time) - getTimeInMinutes(b.time));
 
     // Calcul săptămână de Luni până Duminică
     const getWeekDays = () => {
@@ -393,7 +396,10 @@ export default function Calendar({ accessToken }) {
                                     if (item.empty) {
                                         return <View key={item.id} style={[styles.dayCell, styles.emptyCell]} />;
                                     }
-                                    const dayEvents = events.filter(e => e.date === item.dateString);
+                                    const dayEvents = events
+                                        .filter(e => e.date === item.dateString)
+                                        .sort((a, b) => getTimeInMinutes(a.time) - getTimeInMinutes(b.time));
+
                                     const isSelected = selectedDate === item.dateString;
                                     const isToday = item.dateString === formatDateToRO(new Date());
 
@@ -413,7 +419,7 @@ export default function Calendar({ accessToken }) {
                                                     <View key={ev.id} style={styles.miniEventBadge}>
                                                         <View style={styles.dotIndicator} />
                                                         <Text numberOfLines={1} style={styles.miniEventText}>
-                                                            {ev.time !== 'All Day' ? `${ev.time}${ev.end_time ? ` - ${ev.end_time}` : ''} ` : ''}{ev.title}
+                                                            {ev.title}
                                                         </Text>
                                                     </View>
                                                 ))}
@@ -456,13 +462,8 @@ export default function Calendar({ accessToken }) {
                             {/* Corp cu Scroll de la 00:00 la 23:59 */}
                             <ScrollView style={styles.timeGridScroll} showsVerticalScrollIndicator={true}>
                                 {hours24.map((hObj) => {
-                                    const hourEvents = events.filter(event =>
-                                        activeTimeGridColumns.includes(event.date) &&
-                                        getTimeInMinutes(event.time) >= hObj.hourNum * 60 &&
-                                        getTimeInMinutes(event.time) < (hObj.hourNum + 1) * 60
-                                    );
                                     return (
-                                        <View key={hObj.hourNum} style={[styles.hourRow, hourEvents.length > 0 && styles.hourRowWithEvent]}>
+                                        <View key={hObj.hourNum} style={styles.hourRow}>
                                             <View style={styles.hourLabelContainer}>
                                                 <Text style={styles.hourLabelText}>{hObj.hourNum === 0 ? '' : hObj.label}</Text>
                                             </View>
@@ -471,7 +472,7 @@ export default function Calendar({ accessToken }) {
                                                     if (e.date !== colDate) return false;
                                                     const eventMinutes = getTimeInMinutes(e.time);
                                                     return eventMinutes >= hObj.hourNum * 60 && eventMinutes < (hObj.hourNum + 1) * 60;
-                                                });
+                                                }).sort((a, b) => getTimeInMinutes(a.time) - getTimeInMinutes(b.time));
 
                                                 return (
                                                     <TouchableOpacity
@@ -494,14 +495,14 @@ export default function Calendar({ accessToken }) {
                                                                     {
                                                                         top: (getTimeInMinutes(ev.time) % 60) * (50 / 60),
                                                                         height: Math.max(
-                                                                            20,
+                                                                            30,
                                                                             ((getTimeInMinutes(ev.end_time || ev.time) -
                                                                                 getTimeInMinutes(ev.time)) || 30) * (50 / 60)
                                                                         ),
                                                                     },
                                                                 ]}
                                                             >
-                                                                <Text numberOfLines={1} style={styles.gridEventText}>
+                                                                <Text style={styles.gridEventText}>
                                                                     {ev.time}{ev.end_time ? ` - ${ev.end_time}` : ''} {ev.title}
                                                                 </Text>
                                                             </View>
@@ -517,29 +518,75 @@ export default function Calendar({ accessToken }) {
                     )}
 
                     {viewMode === 'year' && (
-                        <View style={styles.yearViewContainer}>
-                            <Text style={styles.yearViewTitle}>Anul {year}</Text>
-                            <ScrollView contentContainerStyle={styles.yearMonthsGrid}>
-                                {monthNames.map((mName, mIdx) => (
-                                    <TouchableOpacity
-                                        key={mIdx}
-                                        style={styles.yearMonthCard}
-                                        onPress={() => {
-                                            setCurrentDate(new Date(year, mIdx, 1));
-                                            setViewMode('month');
-                                        }}
-                                    >
-                                        <Text style={styles.yearMonthName}>{mName}</Text>
-                                        <Text style={styles.yearMonthCount}>
-                                            {events.filter(e => {
-                                                const parts = e.date.split('-');
-                                                return parseInt(parts[1]) === mIdx + 1 && parseInt(parts[2]) === year;
-                                            }).length} evenimente
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
+                        <ScrollView contentContainerStyle={styles.yearViewContainer} showsVerticalScrollIndicator={false}>
+                            <View style={styles.yearMonthsGrid}>
+                                {monthNames.map((mName, mIdx) => {
+                                    // Calcul zile pentru fiecare lună din an
+                                    const mFirstDayObj = new Date(year, mIdx, 1);
+                                    let mFirstDayIndex = mFirstDayObj.getDay() - 1;
+                                    if (mFirstDayIndex === -1) mFirstDayIndex = 6;
+                                    const mTotalDays = new Date(year, mIdx + 1, 0).getDate();
+
+                                    const mDays = [];
+                                    for (let i = 0; i < mFirstDayIndex; i++) {
+                                        const prevDaysCount = new Date(year, mIdx, 0).getDate();
+                                        const dNum = prevDaysCount - mFirstDayIndex + i + 1;
+                                        mDays.push({ empty: true, dayNumber: dNum, id: `ym-${mIdx}-empty-${i}` });
+                                    }
+                                    for (let d = 1; d <= mTotalDays; d++) {
+                                        const cDate = new Date(year, mIdx, d);
+                                        const dStr = formatDateToRO(cDate);
+                                        mDays.push({ empty: false, dayNumber: d, dateString: dStr, id: `ym-${mIdx}-${dStr}` });
+                                    }
+
+                                    return (
+                                        <TouchableOpacity
+                                            key={mIdx}
+                                            style={styles.yearMonthCard}
+                                            onPress={() => {
+                                                setCurrentDate(new Date(year, mIdx, 1));
+                                                setViewMode('month');
+                                            }}
+                                        >
+                                            <Text style={styles.yearMonthName}>{mName}</Text>
+                                            <View style={styles.yearMiniDaysOfWeek}>
+                                                {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((dChar, dIdx) => (
+                                                    <Text key={dIdx} style={styles.yearMiniDayName}>{dChar}</Text>
+                                                ))}
+                                            </View>
+                                            <View style={styles.yearMiniDaysGrid}>
+                                                {mDays.map((mItem) => {
+                                                    const isSelected = selectedDate === mItem.dateString;
+                                                    const isToday = mItem.dateString === formatDateToRO(new Date());
+                                                    const hasEvents = !mItem.empty && events.some(e => e.date === mItem.dateString);
+
+                                                    return (
+                                                        <View
+                                                            key={mItem.id}
+                                                            style={[
+                                                                styles.yearMiniCell,
+                                                                isSelected && styles.yearMiniSelectedCell,
+                                                                isToday && !isSelected && styles.yearMiniTodayCell
+                                                            ]}
+                                                        >
+                                                            <Text style={[
+                                                                styles.yearMiniCellText,
+                                                                mItem.empty && styles.yearMiniEmptyText,
+                                                                isSelected && styles.yearMiniSelectedText,
+                                                                isToday && styles.yearMiniTodayText
+                                                            ]}>
+                                                                {mItem.dayNumber}
+                                                            </Text>
+                                                            {hasEvents && <View style={styles.yearEventDot} />}
+                                                        </View>
+                                                    );
+                                                })}
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </ScrollView>
                     )}
                 </View>
 
@@ -710,20 +757,45 @@ const styles = StyleSheet.create({
     timeDayHeaderNum: { fontSize: 13, color: '#f8fafc', fontWeight: '700', marginTop: 2 },
     timeDayHeaderCircle: { fontSize: 13, color: '#fff', backgroundColor: '#4f46e5', width: 24, height: 24, borderRadius: 12, textAlign: 'center', lineHeight: 24, fontWeight: '700', marginTop: 2 },
     timeGridScroll: { flex: 1 },
-    hourRow: { flexDirection: 'row', height: 50, borderBottomWidth: 0.5, borderBottomColor: '#1e293b', overflow: 'visible' },
-    hourRowWithEvent: { zIndex: 1, elevation: 1 },
+    hourRow: { flexDirection: 'row', height: 50, borderBottomWidth: 0.5, borderBottomColor: '#1e293b' },
     hourLabelContainer: { width: 60, alignItems: 'flex-end', paddingRight: 8, paddingTop: 4 },
     hourLabelText: { fontSize: 10, color: '#64748b', fontWeight: '500' },
-    hourCell: { flex: 1, borderLeftWidth: 0.5, borderLeftColor: '#1e293b', padding: 2, position: 'relative', overflow: 'visible' },
-    gridEventBlock: { position: 'absolute', left: 2, right: 2, zIndex: 2, backgroundColor: 'rgba(99, 102, 241, 0.7)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
-    gridEventText: { fontSize: 11, color: '#f8fafc', fontWeight: '600' },
+    hourCell: { flex: 1, borderLeftWidth: 0.5, borderLeftColor: '#1e293b', padding: 2, position: 'relative' },
 
-    yearViewContainer: { flex: 1, padding: 8 },
-    yearViewTitle: { fontSize: 18, fontWeight: '700', color: '#f8fafc', marginBottom: 12 },
-    yearMonthsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    yearMonthCard: { width: '30%', backgroundColor: '#030712', borderWidth: 1, borderColor: '#1e293b', borderRadius: 12, padding: 12, alignItems: 'center', gap: 6 },
-    yearMonthName: { fontSize: 14, fontWeight: '700', color: '#f8fafc' },
-    yearMonthCount: { fontSize: 11, color: '#818cf8' },
+    gridEventBlock: {
+        position: 'absolute',
+        left: 2,
+        right: 2,
+        zIndex: 2,
+        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 6,
+        overflow: 'hidden'
+    },
+    gridEventText: {
+        fontSize: 11,
+        color: '#f8fafc',
+        fontWeight: '600',
+        flexWrap: 'wrap'
+    },
+
+    // 💡 Stiluri noi pentru vizualizarea pe an (Year View)
+    yearViewContainer: { padding: 4 },
+    yearMonthsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16 },
+    yearMonthCard: { width: '31%', backgroundColor: '#030712', borderWidth: 1, borderColor: '#1e293b', borderRadius: 12, padding: 10 },
+    yearMonthName: { fontSize: 13, fontWeight: '700', color: '#f8fafc', marginBottom: 6, textAlign: 'center' },
+    yearMiniDaysOfWeek: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+    yearMiniDayName: { fontSize: 9, fontWeight: '600', color: '#64748b', width: 18, textAlign: 'center' },
+    yearMiniDaysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    yearMiniCell: { width: '14.28%', height: 22, justifyContent: 'center', alignItems: 'center', marginVertical: 1, position: 'relative' },
+    yearMiniCellText: { fontSize: 10, color: '#cbd5e1' },
+    yearMiniEmptyText: { color: '#334155' },
+    yearMiniTodayCell: { borderWidth: 1, borderColor: '#4f46e5', borderRadius: 11 },
+    yearMiniTodayText: { color: '#818cf8', fontWeight: '700' },
+    yearMiniSelectedCell: { backgroundColor: '#4f46e5', borderRadius: 11 },
+    yearMiniSelectedText: { color: '#fff', fontWeight: '700' },
+    yearEventDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#818cf8', position: 'absolute', bottom: 2 },
 
     sidePanel: { width: 280, backgroundColor: '#0b0f19', borderRadius: 16, borderWidth: 1, borderColor: '#1e293b', padding: 16, gap: 12 },
     sidePanelTitle: { fontSize: 12, color: '#64748b', fontWeight: '600', textTransform: 'uppercase' },

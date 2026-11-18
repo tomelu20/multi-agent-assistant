@@ -51,13 +51,13 @@ def get_current_user(
 
 @router.get("/events", response_model=List[CalendarEventResponse])
 def get_calendar_events(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user),
 ):
     events = (
         db.query(CalendarEvent)
         .filter(CalendarEvent.user_id == current_user.id)
-        .order_by(CalendarEvent.created_at)
+        .order_by(CalendarEvent.event_date, CalendarEvent.event_time) # <- Modificat aici
         .all()
     )
     return events
