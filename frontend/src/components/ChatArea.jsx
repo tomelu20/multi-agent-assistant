@@ -69,7 +69,6 @@ export default function ChatArea({ messages, onSendMessage, pendingApproval, onA
 
     return (
         <View style={styles.chatContainer}>
-            {/* Fundal invizibil pentru a închide meniurile la click în afara lor */}
             {(showAttachMenu || showAgentMenu) && (
                 <div
                     style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 }}
@@ -143,13 +142,12 @@ export default function ChatArea({ messages, onSendMessage, pendingApproval, onA
                     />
 
                     <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                        {/* Buton Atașare & Meniu Popup (Doar Upload files și Add from Drive) */}
                         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, position: 'relative' }}>
                             <TouchableOpacity
                                 style={styles.toolBtn}
                                 onPress={() => {
                                     setShowAttachMenu(!showAttachMenu);
-                                    setShowAgentMenu(false); // Închide meniul de agenți dacă era deschis
+                                    setShowAgentMenu(false);
                                 }}
                             >
                                 <Ionicons name="attach-outline" size={18} color="#94a3b8" />
@@ -168,12 +166,11 @@ export default function ChatArea({ messages, onSendMessage, pendingApproval, onA
                                 </View>
                             )}
 
-                            {/* Selector Agent */}
                             <TouchableOpacity
                                 style={styles.agentSelectorBtn}
                                 onPress={() => {
                                     setShowAgentMenu(!showAgentMenu);
-                                    setShowAttachMenu(false); // Închide meniul de atașamente dacă era deschis
+                                    setShowAttachMenu(false);
                                 }}
                             >
                                 <Ionicons name="hardware-chip-outline" size={14} color="#818cf8" />
@@ -197,7 +194,6 @@ export default function ChatArea({ messages, onSendMessage, pendingApproval, onA
                             )}
                         </div>
 
-                        {/* Microfon & Buton Trimite */}
                         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <TouchableOpacity
                                 style={[styles.micBtn, isRecording && styles.micBtnActive]}

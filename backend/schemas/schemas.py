@@ -124,7 +124,6 @@ class VerifyCodeRequest(BaseModel):
     code: str
 
 
-# Scheme pentru Calendar adaptate pentru UUID și formatul românesc DD-MM-YYYY
 class CalendarEventBase(BaseModel):
     title: str = Field(..., max_length=200)
     date: str = Field(..., max_length=10)  # Format: DD-MM-YYYY (ex: 15-11-2026)

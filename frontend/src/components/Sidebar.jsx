@@ -2,21 +2,19 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function Sidebar({ isOpen, toggleSidebar, activeSection, setActiveSection, chatHistory, selectChat, currentChatId }) {
+export default function Sidebar({ isOpen, toggleSidebar, activeSection, setActiveSection, chatHistory, selectChat, currentChatId, onNewChat }) {
     const [searchQuery, setSearchQuery] = useState('');
     const screenWidth = Dimensions.get('window').width;
-    const isMobile = screenWidth < 768; // Detectare ecran mic de telefon
+    const isMobile = screenWidth < 768;
 
     const filteredChats = chatHistory.filter(chat =>
-        chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+        chat.title && chat.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Dacă este pe mobil și sidebar-ul este închis, nu îl afișăm deloc în flux
     if (isMobile && !isOpen) {
         return null;
     }
 
-    // Pe mobil, când este deschis, devine overlay absolut peste conținut
     const sidebarStyles = isMobile ? [styles.expandedContainer, styles.mobileOverlay] : (!isOpen ? styles.collapsedContainer : styles.expandedContainer);
 
     if (!isOpen && !isMobile) {
@@ -25,11 +23,8 @@ export default function Sidebar({ isOpen, toggleSidebar, activeSection, setActiv
                 <TouchableOpacity style={styles.iconButton} onPress={toggleSidebar}>
                     <Ionicons name="menu-outline" size={22} color="#f8fafc" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton} onPress={() => setActiveSection('chat')}>
+                <TouchableOpacity style={styles.iconButton} onPress={() => { onNewChat(); setActiveSection('chat'); }}>
                     <Ionicons name="add-outline" size={22} color="#818cf8" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton} onPress={() => setActiveSection('search')}>
-                    <Ionicons name="search-outline" size={20} color="#94a3b8" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconButton} onPress={() => setActiveSection('calendar')}>
                     <Ionicons name="calendar-outline" size={20} color="#94a3b8" />
@@ -52,7 +47,6 @@ export default function Sidebar({ isOpen, toggleSidebar, activeSection, setActiv
 
     return (
         <>
-            {/* Fundal întunecat pentru închiderea drawer-ului pe mobil la click în afara lui */}
             {isMobile && isOpen && (
                 <div
                     style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 150 }}
@@ -71,7 +65,7 @@ export default function Sidebar({ isOpen, toggleSidebar, activeSection, setActiv
                     </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={styles.newChatBtn} onPress={() => { setActiveSection('chat'); if(isMobile) toggleSidebar(); }}>
+                <TouchableOpacity style={styles.newChatBtn} onPress={() => { onNewChat(); setActiveSection('chat'); if(isMobile) toggleSidebar(); }}>
                     <Ionicons name="add" size={18} color="#818cf8" />
                     <Text style={styles.newChatText}>Chat Nou / Workflow</Text>
                 </TouchableOpacity>

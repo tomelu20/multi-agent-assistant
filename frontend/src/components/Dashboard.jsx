@@ -1,47 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, SafeAreaView, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Sidebar from './Sidebar';
 import ChatArea from './ChatArea';
-import Calendar from './Calendar'; // Importăm noul ecran de calendar
+import Calendar from './Calendar';
+import { api } from '../services/api';
 
 export default function Dashboard({ route, navigation }) {
     const userName = route?.params?.userName || 'Utilizator';
     const userId = route?.params?.userId;
     const accessToken = route?.params?.accessToken;
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [activeSection, setActiveSection] = useState('chat');
 
-    const [chatHistory, setChatHistory] = useState([
-        { id: 1, title: 'Planificare zi de mâine & Teză' },
-        { id: 2, title: 'Sincronizare Calendar & Notițe' }
-    ]);
-    const [currentChatId, setCurrentChatId] = useState(1);
+    const [chatHistory, setChatHistory] = useState([]);
+    const [currentChatId, setCurrentChatId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [pendingApproval, setPendingApproval] = useState(false);
+    const [executionLogs, setExecutionLogs] = useState([]);
 
-    const handleSendMessage = (text, file, agent) => {
-        const newMsg = { sender: 'user', text, file, agent };
-        setMessages(prev => [...prev, newMsg]);
-
-        setTimeout(() => {
-            setMessages(prev => [
-                ...prev,
-                {
-                    sender: 'assistant',
-                    text: `[${agent}] Am preluat cererea ta. Am descompus-o în pași prin Planner și am verificat calendarul.`
+    // 1. Preluare istoric chat-uri la montare
+    useEffect(() => {
+        if (userId) {
+            api.getChats(userId).then(chats => {
+                setChatHistory(chats);
+                if (chats && chats.length > 0) {
+                    setCurrentChatId(chats[0].id);
                 }
-            ]);
-            setPendingApproval(true);
-        }, 1200);
+            }).catch(err => console.error("Eroare preluare chat-uri:", err));
+        }
+    }, [userId]);
+
+    // 2. Creare chat nou (la click pe "Chat Nou / Workflow")
+    const handleNewChat = async () => {
+        try {
+            const newChat = await api.createChat(userId, "Chat Nou");
+            setChatHistory(prev => [newChat, ...prev]);
+            setCurrentChatId(newChat.id);
+            setMessages([]);
+            setPendingApproval(false);
+        } catch (err) {
+            console.error("Eroare creare chat:", err);
+        }
     };
 
-    const handleApprove = () => {
-        setPendingApproval(false);
-        setMessages(prev => [
-            ...prev,
-            { sender: 'assistant', text: '✅ Aprobare umană confirmată. Acțiunile externe au fost executate cu succes!' }
-        ]);
+    // 3. Trimitere mesaj (dacă nu e selectat niciun chat, creează unul nou automat)
+    const handleSendMessage = async (text, file, agent) => {
+        let activeId = currentChatId;
+
+        try {
+            // Dacă nu avem un chat selectat, îl creăm acum pe loc cu textul primului mesaj
+            if (!activeId) {
+                const newChat = await api.createChat(userId, text);
+                activeId = newChat.id;
+                setCurrentChatId(activeId);
+                setChatHistory(prev => [newChat, ...prev]);
+            }
+
+            // Adăugăm mesajul utilizatorului în interfață instant
+            const userMsg = { sender: 'user', text, file, agent };
+            setMessages(prev => [...prev, userMsg]);
+
+            // Apelăm backend-ul pentru trimiterea mesajului
+            const response = await api.sendMessage(activeId, text);
+
+            setMessages(prev => [
+                ...prev,
+                { sender: 'assistant', text: response.reply }
+            ]);
+
+            setPendingApproval(response.requiresApproval);
+
+            // Actualizăm titlul în Sidebar dacă s-a generat
+            if (response.newTitle) {
+                setChatHistory(prev => prev.map(chat =>
+                    chat.id === activeId ? { ...chat, title: response.newTitle } : chat
+                ));
+            }
+
+            // Preluăm logurile de execuție
+            const logs = await api.getLogs(activeId);
+            setExecutionLogs(logs);
+
+        } catch (err) {
+            console.error("Eroare trimitere mesaj:", err);
+        }
+    };
+
+    // 4. Aprobare umană (Human-in-the-Loop)
+    const handleApprove = async () => {
+        if (!currentChatId) return;
+        try {
+            const response = await api.approveAction(currentChatId);
+            setPendingApproval(false);
+            setMessages(prev => [
+                ...prev,
+                { sender: 'assistant', text: response.message }
+            ]);
+        } catch (err) {
+            console.error("Eroare aprobare:", err);
+        }
     };
 
     const handleLogout = () => {
@@ -82,6 +141,7 @@ export default function Dashboard({ route, navigation }) {
                     chatHistory={chatHistory}
                     selectChat={setCurrentChatId}
                     currentChatId={currentChatId}
+                    onNewChat={handleNewChat}
                 />
 
                 {activeSection === 'chat' && (
@@ -93,7 +153,6 @@ export default function Dashboard({ route, navigation }) {
                     />
                 )}
 
-                {/* Aici randăm componenta Calendar pe care am creat-o */}
                 {activeSection === 'calendar' && (
                     <Calendar userId={userId} accessToken={accessToken} />
                 )}
@@ -101,7 +160,13 @@ export default function Dashboard({ route, navigation }) {
                 {activeSection === 'logs' && (
                     <View style={styles.contentSection}>
                         <Text style={styles.sectionTitle}>Jurnal de Execuție (Execution Logs)</Text>
-                        <Text style={styles.sectionSub}>Istoricul acțiunilor fiecărui agent specializat în parte.</Text>
+                        <Text style={styles.sectionSub}>Istoricul acțiunilor fiecărui agent specializat.</Text>
+                        {executionLogs.map((log, index) => (
+                            <View key={index} style={styles.logCard}>
+                                <Text style={styles.logText}>Agent: {log.agent_name} | Tool: {log.tool_name}</Text>
+                                <Text style={styles.logSubText}>Status: {log.success ? 'Succes' : 'Eșuat'} ({log.timestamp})</Text>
+                            </View>
+                        ))}
                     </View>
                 )}
 
@@ -115,7 +180,7 @@ export default function Dashboard({ route, navigation }) {
                 {activeSection === 'memory' && (
                     <View style={styles.contentSection}>
                         <Text style={styles.sectionTitle}>Memorie & Preferințe Utilizator</Text>
-                        <Text style={styles.sectionSub}>Controlul pe termen lung și scurt al memoriei asistentului.</Text>
+                        <Text style={styles.sectionSub}>Controlul pe termen lung și scurt al memoriei.</Text>
                     </View>
                 )}
 
@@ -143,5 +208,8 @@ const styles = StyleSheet.create({
     mainLayout: { flex: 1, flexDirection: 'row' },
     contentSection: { flex: 1, padding: 32, backgroundColor: '#030712', gap: 8 },
     sectionTitle: { fontSize: 22, fontWeight: '700', color: '#f8fafc' },
-    sectionSub: { fontSize: 14, color: '#94a3b8' }
+    sectionSub: { fontSize: 14, color: '#94a3b8' },
+    logCard: { backgroundColor: '#0b0f19', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1e293b', marginTop: 8 },
+    logText: { color: '#818cf8', fontSize: 13, fontWeight: '600' },
+    logSubText: { color: '#94a3b8', fontSize: 11, marginTop: 4 }
 });
