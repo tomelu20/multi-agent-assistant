@@ -12,20 +12,20 @@ export const api = {
         return res.json();
     },
 
-    async createChat(userId, rawRequest = "Chat Nou") {
+    async createChat(userId, rawRequest = "Chat Nou", file = null) {
         const res = await fetch(`${API_URL}/chats?user_id=${userId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ raw_request: rawRequest })
+            body: JSON.stringify({ raw_request: rawRequest, file })
         });
         return res.json();
     },
 
-    async sendMessage(chatId, text) {
+    async sendMessage(chatId, text, file = null) {
         const res = await fetch(`${API_URL}/chats/${chatId}/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ raw_request: text })
+            body: JSON.stringify({ raw_request: text, file })
         });
         return res.json();
     },

@@ -125,44 +125,52 @@ export default function Dashboard({ route, navigation }) {
         setExecutionLogs([]);
     };
 
-    // 3. Trimitere mesaj (dacă nu e selectat niciun chat, creează unul nou automat abia la primul mesaj)
+    // 3. Trimitere mesaj / document (păstrează fișierul ca obiect file în istoric, fără răspuns automat când este doar fișier)
     const handleSendMessage = async (text, file, agent) => {
         let activeId = currentChatId;
+        const cleanText = (text && text.trim()) ? text.trim() : '';
+        const normalizedFile = file && file.name
+            ? {
+                name: file.name,
+                ext: file.ext || (file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : 'FILE'),
+                size: file.size || 0,
+                source: file.source || 'local'
+            }
+            : null;
+        const topicFallback = cleanText || (normalizedFile ? normalizedFile.name : '');
 
         try {
-            // Dacă nu avem un chat selectat, îl creăm acum pe loc cu textul primului mesaj
             if (!activeId) {
-                const newChat = await api.createChat(userId, text);
+                const newChat = await api.createChat(userId, topicFallback, normalizedFile);
                 activeId = newChat.id;
                 setCurrentChatId(activeId);
                 setIsDraftChat(false);
                 setChatHistory(prev => [newChat, ...prev]);
             }
 
-            // Adăugăm mesajul utilizatorului în interfață instant
-            const userMsg = { sender: 'user', text, file, agent };
+            const userMsg = { sender: 'user', text: cleanText, file: normalizedFile, agent };
             setMessages(prev => [...prev, userMsg]);
 
-            // Apelăm backend-ul pentru trimiterea mesajului
-            const response = await api.sendMessage(activeId, text);
+            const response = await api.sendMessage(activeId, cleanText, normalizedFile);
 
-            setMessages(prev => [
-                ...prev,
-                { sender: 'assistant', text: response.reply }
-            ]);
+            if (!normalizedFile && response?.reply) {
+                setMessages(prev => [
+                    ...prev,
+                    { sender: 'assistant', text: response.reply, file: null }
+                ]);
+                setPendingApproval(Boolean(response?.requiresApproval));
+            } else {
+                setPendingApproval(false);
+            }
 
-            setPendingApproval(response.requiresApproval);
-
-            // Actualizăm titlul în Sidebar doar dacă a fost generat (la primul mesaj)
-            if (response.newTitle) {
+            if (response?.newTitle) {
                 setChatHistory(prev => prev.map(chat =>
                     chat.id === activeId ? { ...chat, title: response.newTitle } : chat
                 ));
             }
 
-            // Preluăm logurile de execuție
             const logs = await api.getLogs(activeId);
-            setExecutionLogs(logs);
+            setExecutionLogs(Array.isArray(logs) ? logs : []);
 
         } catch (err) {
             console.error("Eroare trimitere mesaj:", err);
@@ -177,7 +185,7 @@ export default function Dashboard({ route, navigation }) {
             setPendingApproval(false);
             setMessages(prev => [
                 ...prev,
-                { sender: 'assistant', text: response.message }
+                { sender: 'assistant', text: response.message, file: null }
             ]);
         } catch (err) {
             console.error("Eroare aprobare:", err);
