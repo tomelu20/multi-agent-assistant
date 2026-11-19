@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, SafeAreaView, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Sidebar from './Sidebar';
@@ -6,46 +6,126 @@ import ChatArea from './ChatArea';
 import Calendar from './Calendar';
 import { api } from '../services/api';
 
+const STORAGE_USER_ID_KEY = 'productivity_assistant_user_id';
+const STORAGE_USER_NAME_KEY = 'productivity_assistant_user_name';
+
 export default function Dashboard({ route, navigation }) {
-    const userName = route?.params?.userName || 'Utilizator';
-    const userId = route?.params?.userId;
+    const paramUserId = route?.params?.userId;
+    const paramUserName = route?.params?.userName;
     const accessToken = route?.params?.accessToken;
+
+    const [userId, setUserId] = useState(() => {
+        if (paramUserId) return paramUserId;
+        try {
+            return typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_USER_ID_KEY) : null;
+        } catch (_) {
+            return null;
+        }
+    });
+
+    const [userName, setUserName] = useState(() => {
+        if (paramUserName) return paramUserName;
+        try {
+            return (typeof window !== 'undefined' && window.localStorage.getItem(STORAGE_USER_NAME_KEY)) || 'Utilizator';
+        } catch (_) {
+            return 'Utilizator';
+        }
+    });
+
+    useEffect(() => {
+        if (paramUserId) {
+            setUserId(paramUserId);
+            try {
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(STORAGE_USER_ID_KEY, String(paramUserId));
+                }
+            } catch (_) {}
+        }
+        if (paramUserName) {
+            setUserName(paramUserName);
+            try {
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(STORAGE_USER_NAME_KEY, String(paramUserName));
+                }
+            } catch (_) {}
+        }
+    }, [paramUserId, paramUserName]);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [activeSection, setActiveSection] = useState('chat');
 
     const [chatHistory, setChatHistory] = useState([]);
     const [currentChatId, setCurrentChatId] = useState(null);
+    const [isDraftChat, setIsDraftChat] = useState(false);
     const [messages, setMessages] = useState([]);
     const [pendingApproval, setPendingApproval] = useState(false);
     const [executionLogs, setExecutionLogs] = useState([]);
 
-    // 1. Preluare istoric chat-uri la montare
-    useEffect(() => {
-        if (userId) {
-            api.getChats(userId).then(chats => {
-                setChatHistory(chats);
-                if (chats && chats.length > 0) {
-                    setCurrentChatId(chats[0].id);
-                }
-            }).catch(err => console.error("Eroare preluare chat-uri:", err));
-        }
-    }, [userId]);
-
-    // 2. Creare chat nou (la click pe "Chat Nou / Workflow")
-    const handleNewChat = async () => {
-        try {
-            const newChat = await api.createChat(userId, "Chat Nou");
-            setChatHistory(prev => [newChat, ...prev]);
-            setCurrentChatId(newChat.id);
+    const loadChatSession = useCallback(async (chatId) => {
+        if (!chatId) {
+            setCurrentChatId(null);
+            setIsDraftChat(false);
             setMessages([]);
             setPendingApproval(false);
-        } catch (err) {
-            console.error("Eroare creare chat:", err);
+            setExecutionLogs([]);
+            return;
         }
+
+        setCurrentChatId(chatId);
+        setIsDraftChat(false);
+
+        try {
+            const data = await api.getChatMessages(chatId);
+            if (data && Array.isArray(data.messages)) {
+                setMessages(data.messages);
+            } else {
+                setMessages([]);
+            }
+            setPendingApproval(Boolean(data?.requiresApproval));
+
+            const logs = await api.getLogs(chatId);
+            setExecutionLogs(Array.isArray(logs) ? logs : []);
+        } catch (err) {
+            console.error("Eroare încărcare istoric chat:", err);
+        }
+    }, []);
+
+    // 1. Preluare istoric chat-uri la montare și încărcarea primului chat dacă există
+    useEffect(() => {
+        api.getChats(userId).then(chats => {
+            const list = Array.isArray(chats) ? chats : [];
+            setChatHistory(list);
+            if (list.length > 0) {
+                if (list[0].user_id) {
+                    setUserId(list[0].user_id);
+                    try {
+                        if (typeof window !== 'undefined') {
+                            window.localStorage.setItem(STORAGE_USER_ID_KEY, String(list[0].user_id));
+                        }
+                    } catch (_) {}
+                }
+                loadChatSession(list[0].id);
+            }
+        }).catch(err => console.error("Eroare preluare chat-uri:", err));
+    }, [userId, loadChatSession]);
+
+    // 2. Creare chat nou (la click pe "Chat Nou / Workflow") — rămâne pe același draft gol dacă nu s-a scris nimic
+    const handleNewChat = () => {
+        if (isDraftChat && messages.length === 0) {
+            setCurrentChatId(null);
+            setMessages([]);
+            setPendingApproval(false);
+            setExecutionLogs([]);
+            return;
+        }
+        setCurrentChatId(null);
+        setIsDraftChat(true);
+        setMessages([]);
+        setPendingApproval(false);
+        setExecutionLogs([]);
     };
 
-    // 3. Trimitere mesaj (dacă nu e selectat niciun chat, creează unul nou automat)
+    // 3. Trimitere mesaj (dacă nu e selectat niciun chat, creează unul nou automat abia la primul mesaj)
     const handleSendMessage = async (text, file, agent) => {
         let activeId = currentChatId;
 
@@ -55,6 +135,7 @@ export default function Dashboard({ route, navigation }) {
                 const newChat = await api.createChat(userId, text);
                 activeId = newChat.id;
                 setCurrentChatId(activeId);
+                setIsDraftChat(false);
                 setChatHistory(prev => [newChat, ...prev]);
             }
 
@@ -72,7 +153,7 @@ export default function Dashboard({ route, navigation }) {
 
             setPendingApproval(response.requiresApproval);
 
-            // Actualizăm titlul în Sidebar dacă s-a generat
+            // Actualizăm titlul în Sidebar doar dacă a fost generat (la primul mesaj)
             if (response.newTitle) {
                 setChatHistory(prev => prev.map(chat =>
                     chat.id === activeId ? { ...chat, title: response.newTitle } : chat
@@ -139,7 +220,7 @@ export default function Dashboard({ route, navigation }) {
                     activeSection={activeSection}
                     setActiveSection={setActiveSection}
                     chatHistory={chatHistory}
-                    selectChat={setCurrentChatId}
+                    selectChat={loadChatSession}
                     currentChatId={currentChatId}
                     onNewChat={handleNewChat}
                 />

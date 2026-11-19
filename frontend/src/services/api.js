@@ -7,6 +7,11 @@ export const api = {
         return res.json();
     },
 
+    async getChatMessages(chatId) {
+        const res = await fetch(`${API_URL}/chats/${chatId}/messages`);
+        return res.json();
+    },
+
     async createChat(userId, rawRequest = "Chat Nou") {
         const res = await fetch(`${API_URL}/chats?user_id=${userId}`, {
             method: 'POST',

@@ -7,9 +7,10 @@ export default function Sidebar({ isOpen, toggleSidebar, activeSection, setActiv
     const screenWidth = Dimensions.get('window').width;
     const isMobile = screenWidth < 768;
 
-    const filteredChats = chatHistory.filter(chat =>
-        chat.title && chat.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredChats = chatHistory.filter(chat => {
+        const label = chat.title || chat.raw_request || 'Chat Nou';
+        return label.toLowerCase().includes(searchQuery.toLowerCase());
+    });
 
     if (isMobile && !isOpen) {
         return null;
@@ -58,7 +59,7 @@ export default function Sidebar({ isOpen, toggleSidebar, activeSection, setActiv
                 <View style={styles.sidebarHeader}>
                     <View style={styles.brandRow}>
                         <Ionicons name="sparkles" size={20} color="#818cf8" />
-                        <Text style={styles.brandTitle}>Productivity</Text>
+                        <Text style={styles.brandTitle}>Productivity Assistant</Text>
                     </View>
                     <TouchableOpacity onPress={toggleSidebar} style={styles.iconButton}>
                         <Ionicons name="panel-left-close-outline" size={20} color="#94a3b8" />
@@ -132,7 +133,7 @@ export default function Sidebar({ isOpen, toggleSidebar, activeSection, setActiv
                             >
                                 <Ionicons name="chatbubble-outline" size={14} color={currentChatId === chat.id ? '#818cf8' : '#64748b'} />
                                 <Text numberOfLines={1} style={[styles.historyText, currentChatId === chat.id && styles.historyTextActive]}>
-                                    {chat.title}
+                                    {chat.title || chat.raw_request || 'Chat Nou'}
                                 </Text>
                             </TouchableOpacity>
                         ))}
