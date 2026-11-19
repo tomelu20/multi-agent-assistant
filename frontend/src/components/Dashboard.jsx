@@ -4,6 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Sidebar from './Sidebar';
 import ChatArea from './ChatArea';
 import Calendar from './Calendar';
+import ExecutionLogs from './ExecutionLogs';
+import TasksNotes from './TasksNotes';
+import MemoryPreferences from './MemoryPreferences';
+import EvaluationMetrics from './EvaluationMetrics';
 import { api } from '../services/api';
 
 const STORAGE_USER_ID_KEY = 'productivity_assistant_user_id';
@@ -247,37 +251,19 @@ export default function Dashboard({ route, navigation }) {
                 )}
 
                 {activeSection === 'logs' && (
-                    <View style={styles.contentSection}>
-                        <Text style={styles.sectionTitle}>Jurnal de Execuție (Execution Logs)</Text>
-                        <Text style={styles.sectionSub}>Istoricul acțiunilor fiecărui agent specializat.</Text>
-                        {executionLogs.map((log, index) => (
-                            <View key={index} style={styles.logCard}>
-                                <Text style={styles.logText}>Agent: {log.agent_name} | Tool: {log.tool_name}</Text>
-                                <Text style={styles.logSubText}>Status: {log.success ? 'Succes' : 'Eșuat'} ({log.timestamp})</Text>
-                            </View>
-                        ))}
-                    </View>
+                    <ExecutionLogs executionLogs={executionLogs} currentChatId={currentChatId} />
                 )}
 
                 {activeSection === 'tasks' && (
-                    <View style={styles.contentSection}>
-                        <Text style={styles.sectionTitle}>Task-uri & Note</Text>
-                        <Text style={styles.sectionSub}>Sarcini extrase automat din note și documente.</Text>
-                    </View>
+                    <TasksNotes />
                 )}
 
                 {activeSection === 'memory' && (
-                    <View style={styles.contentSection}>
-                        <Text style={styles.sectionTitle}>Memorie & Preferințe Utilizator</Text>
-                        <Text style={styles.sectionSub}>Controlul pe termen lung și scurt al memoriei.</Text>
-                    </View>
+                    <MemoryPreferences />
                 )}
 
                 {activeSection === 'metrics' && (
-                    <View style={styles.contentSection}>
-                        <Text style={styles.sectionTitle}>Metrici de Evaluare (Evaluation Plan)</Text>
-                        <Text style={styles.sectionSub}>Rate de succes, latență, costuri model și eficiență.</Text>
-                    </View>
+                    <EvaluationMetrics />
                 )}
             </View>
         </SafeAreaView>
@@ -295,10 +281,4 @@ const styles = StyleSheet.create({
     logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: 'rgba(239, 68, 68, 0.1)' },
     logoutText: { fontSize: 12, color: '#ef4444', fontWeight: '600' },
     mainLayout: { flex: 1, flexDirection: 'row' },
-    contentSection: { flex: 1, padding: 32, backgroundColor: '#030712', gap: 8 },
-    sectionTitle: { fontSize: 22, fontWeight: '700', color: '#f8fafc' },
-    sectionSub: { fontSize: 14, color: '#94a3b8' },
-    logCard: { backgroundColor: '#0b0f19', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1e293b', marginTop: 8 },
-    logText: { color: '#818cf8', fontSize: 13, fontWeight: '600' },
-    logSubText: { color: '#94a3b8', fontSize: 11, marginTop: 4 }
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from './api';
+import { api } from '../services/api';
 
 const formatDateToRO = (date) => {
     const day = String(date.getDate()).padStart(2, '0');
