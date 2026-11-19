@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+import { api } from './api';
 
 const formatDateToRO = (date) => {
     const day = String(date.getDate()).padStart(2, '0');
@@ -51,13 +50,7 @@ export default function Calendar({ accessToken }) {
             }
 
             try {
-                const response = await fetch(`${API_BASE_URL}/calendar/events`, {
-                    headers: { Authorization: `Bearer ${accessToken}` },
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Evenimentele nu au putut fi încărcate.');
-                }
+                const data = await api.getCalendarEvents(accessToken);
                 if (isCurrent) setEvents(data);
             } catch (error) {
                 console.error('Eroare la încărcarea calendarului:', error);
@@ -177,24 +170,12 @@ export default function Calendar({ accessToken }) {
         setRequestError('');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/calendar/events`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${accessToken}`,
-                },
-                body: JSON.stringify({
-                    title: newTitle.trim(),
-                    date: selectedDate,
-                    time: startTime,
-                    end_time: endTime,
-                }),
+            const savedEvent = await api.createCalendarEvent(accessToken, {
+                title: newTitle.trim(),
+                date: selectedDate,
+                time: startTime,
+                end_time: endTime,
             });
-
-            const savedEvent = await response.json();
-            if (!response.ok) {
-                throw new Error(savedEvent.detail || 'Evenimentul nu a putut fi salvat.');
-            }
 
             setEvents(previousEvents => [...previousEvents, savedEvent]);
             setNewTitle('');
@@ -210,18 +191,7 @@ export default function Calendar({ accessToken }) {
     const handleDeleteEvent = async (eventId) => {
         setRequestError('');
         try {
-            const response = await fetch(`${API_BASE_URL}/calendar/events/${eventId}`, {
-                method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Evenimentul nu a putut fi șters.');
-            }
-
+            await api.deleteCalendarEvent(accessToken, eventId);
             setEvents(previousEvents => previousEvents.filter(ev => ev.id !== eventId));
         } catch (error) {
             console.error('Eroare la ștergerea evenimentului:', error);
